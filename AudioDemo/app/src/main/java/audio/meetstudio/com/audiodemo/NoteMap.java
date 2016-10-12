@@ -114,6 +114,10 @@ public class NoteMap {
      */
     public static String caculateNoteName(float pitch) {
         // 所在八度计算
+        if (pitch < 27.5) {
+            return "";
+        }
+
         int octaveNum = 0;
         int noteIndex = 0;
         for (; octaveNum < 9; octaveNum++) {
@@ -136,7 +140,7 @@ public class NoteMap {
         }
 
         String noteNameInOctave = getNoteNameInOctave(noteIndex);
-        String noteName = String.format("%s%d", noteNameInOctave, noteIndex > 2 ? octaveNum + 1 : octaveNum);
+        String noteName = String.format("%s/%d", noteNameInOctave, noteIndex > 2 ? octaveNum + 1 : octaveNum);
 
         return noteName;
     }

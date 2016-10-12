@@ -8,6 +8,7 @@ public class InputNote {
 
     public String noteName;
     public double timeStamp;
+    public long time;
 
     public InputNote() {
 
