@@ -2,6 +2,8 @@ package audio.meetstudio.com.audiodemo;
 
 import be.tarsos.dsp.AudioDispatcher;
 import be.tarsos.dsp.AudioEvent;
+import be.tarsos.dsp.filters.BandPass;
+import be.tarsos.dsp.filters.LowPassSP;
 import be.tarsos.dsp.io.android.AudioDispatcherFactory;
 import be.tarsos.dsp.onsets.OnsetHandler;
 import be.tarsos.dsp.onsets.PercussionOnsetDetector;
@@ -26,6 +28,7 @@ public class AudioProcess {
     private double threshold = 0.5;
 
     public AudioProcess() {
+
         dispatcher = AudioDispatcherFactory
                 .fromDefaultMicrophone(SAMPLE_RATE, BUFFER_SIZE, 0);
         dispatcher.addAudioProcessor(new PitchProcessor(
@@ -38,6 +41,9 @@ public class AudioProcess {
                         onFreqChangedListener.onFreqChanged(pitchDetectionResult, audioEvent);
                     }
                 }));
+
+        dispatcher.addAudioProcessor(new BandPass(2600, 2500, SAMPLE_RATE));
+
 
         // add a processor, handle percussion event.
 //        dispatcher.addAudioProcessor(new PercussionOnsetDetector(SAMPLE_RATE,
