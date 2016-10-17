@@ -1,20 +1,29 @@
 package audio.meetstudio.com.audiodemo;
 
 import android.Manifest;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
+import android.graphics.Color;
+import android.media.MediaRecorder;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.GridLayoutManager;
+import android.support.v7.widget.LinearLayoutCompat;
 import android.support.v7.widget.Toolbar;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.GridLayout;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -35,7 +44,7 @@ import java.util.TimerTask;
 import be.tarsos.dsp.AudioEvent;
 import be.tarsos.dsp.pitch.PitchDetectionResult;
 
-public class MainActivity extends AppCompatActivity implements UtterProcess.UtterProcessListener, NoteLoader.NoteLoaderListener, PFMusicXmlPlayer.XmlPlayerListener, AudioProcess.OnFreqChangedListener, AudioProcess.OnsetChangedListener {
+public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLoaderListener, PFMusicXmlPlayer.XmlPlayerListener, AudioProcess.OnFreqChangedListener, AudioProcess.OnsetChangedListener {
 
     private final static String TAG = "AudioDemo";
 
@@ -44,6 +53,8 @@ public class MainActivity extends AppCompatActivity implements UtterProcess.Utte
     private TextView mTextView = null;
     private TextView noteNameTextView = null;
     private TextView targetTextView = null;
+    private TextView volumeTextView = null;
+    private GridLayout notesLayout = null;
 
     // MusicXML数据加载
     private NoteLoader noteLoader;
@@ -67,6 +78,7 @@ public class MainActivity extends AppCompatActivity implements UtterProcess.Utte
     private long totalTime = 0;
 
     private ArrayList<NoteBean> noteArray = new ArrayList<>();
+    private ArrayList<TextView> notesTipsArray = new ArrayList<>();
 
     private float timePerTick_f = 0;
     private long ticksPerFrame = 0;
@@ -99,14 +111,9 @@ public class MainActivity extends AppCompatActivity implements UtterProcess.Utte
         mTextView = (TextView) findViewById(R.id.note_pitch);
         noteNameTextView = (TextView) findViewById(R.id.note_name);
         targetTextView = (TextView) findViewById(R.id.target);
+        volumeTextView = (TextView) findViewById(R.id.textview_volume);
 
-        if (hasRecordingPermission()) {
-            showToast("已获取录音权限");
 
-//            startAudioDetect();
-        } else {
-            showToast("未获取录音权限");
-        }
 
         noteLoader = new NoteLoader(this);
 
@@ -136,8 +143,116 @@ public class MainActivity extends AppCompatActivity implements UtterProcess.Utte
 
         inputArray = new ArrayList<>();
 
+        // startRecord();
+
+        notesLayout = (GridLayout) findViewById(R.id.notes_layout);
+
+        TextView t1 = new TextView(this);   t1.setText(" 1 ");
+        TextView t2 = new TextView(this);   t2.setText(" 1 ");
+        TextView t3 = new TextView(this);   t3.setText(" 5 ");
+        TextView t4 = new TextView(this);   t4.setText(" 5 ");
+        TextView t5 = new TextView(this);   t5.setText(" 6 ");
+        TextView t6 = new TextView(this);   t6.setText(" 6 ");
+        TextView t7 = new TextView(this);   t7.setText(" 5 ");
+        TextView t8 = new TextView(this);   t8.setText(" 4 ");
+        TextView t9 = new TextView(this);   t9.setText(" 4 ");
+        TextView t10 = new TextView(this);   t10.setText(" 3 ");
+        TextView t11 = new TextView(this);   t11.setText(" 3 ");
+        TextView t12 = new TextView(this);   t12.setText(" 2 ");
+        TextView t13 = new TextView(this);   t13.setText(" 2 ");
+        TextView t14 = new TextView(this);   t14.setText(" 1 ");
+        TextView t15 = new TextView(this);   t15.setText(" 5 ");
+        TextView t16 = new TextView(this);   t16.setText(" 5 ");
+        TextView t17 = new TextView(this);   t17.setText(" 4 ");
+        TextView t18 = new TextView(this);   t18.setText(" 4 ");
+        TextView t19 = new TextView(this);   t19.setText(" 3 ");
+        TextView t20 = new TextView(this);   t20.setText(" 3 ");
+        TextView t21 = new TextView(this);   t21.setText(" 2 ");
+        TextView t22 = new TextView(this);   t22.setText(" 5 ");
+        TextView t23 = new TextView(this);   t23.setText(" 5 ");
+        TextView t24 = new TextView(this);   t24.setText(" 4 ");
+        TextView t25 = new TextView(this);   t25.setText(" 4 ");
+        TextView t26 = new TextView(this);   t26.setText(" 3 ");
+        TextView t27 = new TextView(this);   t27.setText(" 3 ");
+        TextView t28 = new TextView(this);   t28.setText(" 2 ");
+        TextView t29 = new TextView(this);   t29.setText(" 1 ");
+        TextView t30 = new TextView(this);   t30.setText(" 1 ");
+        TextView t31 = new TextView(this);   t31.setText(" 5 ");
+        TextView t32 = new TextView(this);   t32.setText(" 5 ");
+        TextView t33 = new TextView(this);   t33.setText(" 6 ");
+        TextView t34 = new TextView(this);   t34.setText(" 6 ");
+        TextView t35 = new TextView(this);   t35.setText(" 5 ");
+        TextView t36 = new TextView(this);   t36.setText(" 4 ");
+        TextView t37 = new TextView(this);   t37.setText(" 4 ");
+        TextView t38 = new TextView(this);   t38.setText(" 3 ");
+        TextView t39 = new TextView(this);   t39.setText(" 3 ");
+        TextView t40 = new TextView(this);   t40.setText(" 2 ");
+        TextView t41 = new TextView(this);   t41.setText(" 2 ");
+        TextView t42 = new TextView(this);   t42.setText(" 1 ");
+
+        notesTipsArray.add(t1);
+        notesTipsArray.add(t2);
+        notesTipsArray.add(t3);
+        notesTipsArray.add(t4);
+        notesTipsArray.add(t5);
+        notesTipsArray.add(t6);
+        notesTipsArray.add(t7);
+        notesTipsArray.add(t8);
+        notesTipsArray.add(t9);
+        notesTipsArray.add(t10);
+        notesTipsArray.add(t11);
+        notesTipsArray.add(t12);
+        notesTipsArray.add(t13);
+        notesTipsArray.add(t14);
+        notesTipsArray.add(t15);
+        notesTipsArray.add(t16);
+        notesTipsArray.add(t17);
+        notesTipsArray.add(t18);
+        notesTipsArray.add(t19);
+        notesTipsArray.add(t20);
+        notesTipsArray.add(t21);
+        notesTipsArray.add(t22);
+        notesTipsArray.add(t23);
+        notesTipsArray.add(t24);
+        notesTipsArray.add(t25);
+        notesTipsArray.add(t26);
+        notesTipsArray.add(t27);
+        notesTipsArray.add(t28);
+        notesTipsArray.add(t29);
+        notesTipsArray.add(t30);
+        notesTipsArray.add(t31);
+        notesTipsArray.add(t32);
+        notesTipsArray.add(t33);
+        notesTipsArray.add(t34);
+        notesTipsArray.add(t35);
+        notesTipsArray.add(t36);
+        notesTipsArray.add(t37);
+        notesTipsArray.add(t38);
+        notesTipsArray.add(t39);
+        notesTipsArray.add(t40);
+        notesTipsArray.add(t41);
+        notesTipsArray.add(t42);
+
+        for (int i = 0; i < notesTipsArray.size(); i++) {
+            TextView tv = notesTipsArray.get(i);
+            notesLayout.addView(tv);
+        }
+
+        if (hasRecordingPermission()) {
+            showToast("已获取录音权限");
+
+            startAudioDetect();
+        } else {
+            showToast("未获取录音权限");
+        }
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        audioProcess.stop();
+        stopRecord();
+    }
 
     private static boolean copyAsset(AssetManager assetManager,
                                      String fromAssetPath, String toPath) {
@@ -222,24 +337,32 @@ public class MainActivity extends AppCompatActivity implements UtterProcess.Utte
         audioProcess.start();
     }
 
-    @Override
-    public void onPitchChanged(PitchDetectionResult pitchDetectionResult, AudioEvent audioEvent) {
-        double timeStamp = audioEvent.getTimeStamp();
-        audioEvent.getEndTimeStamp();
-        float pitch = pitchDetectionResult.getPitch();
-
-        if (pitch > -1) {
-            final String msg = "pitch = " + pitch + "\ntimeStamp = " + timeStamp + "\nendTimeStamp = " + audioEvent.getEndTimeStamp();
-            final String noteName = NoteMap.caculateNoteName(pitch);
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    mTextView.setText(msg);
-                    noteNameTextView.setText(noteName);
-                }
-            });
-        }
-    }
+//    @Override
+//    public void onPitchChanged(PitchDetectionResult pitchDetectionResult, AudioEvent audioEvent) {
+//        double timeStamp = audioEvent.getTimeStamp();
+//        audioEvent.getEndTimeStamp();
+//        float pitch = pitchDetectionResult.getPitch();
+//
+//        if (pitch > -1) {
+//            final String msg = "pitch = " + pitch + ",timeStamp = " + timeStamp + ",endTimeStamp = " + audioEvent.getEndTimeStamp();
+//            Log.i("PitchDetect", msg);
+//            if (isChecking) {
+//                fixPitch = Math.max(fixPitch, pitch);
+//                pitchOffset = fixPitch - 261.626f;
+//            } else {
+//                String noteNames = NoteMap.caculateNoteName(pitch);
+//                String[] notesNameArray = noteNames.split(",");
+//                final String noteName = notesNameArray[0];
+//                runOnUiThread(new Runnable() {
+//                    @Override
+//                    public void run() {
+//                        mTextView.setText(msg);
+//                        noteNameTextView.setText(noteName);
+//                    }
+//                });
+//            }
+//        }
+//    }
 
     @Override
     public void onNoteLoaded(NoteLoader loader, String notes) {
@@ -279,7 +402,7 @@ public class MainActivity extends AppCompatActivity implements UtterProcess.Utte
                     long start = tick;
                     int duration = note.getIntrinsicTicks();
                     tick += duration;
-                    NoteBean noteBean = new NoteBean(note.getKeys().get(0), start, duration);
+                    NoteBean noteBean = new NoteBean(note.getKeys().get(0), start, duration, note.isRest());
 
                     noteArray.add(noteBean);
                 }
@@ -407,17 +530,79 @@ public class MainActivity extends AppCompatActivity implements UtterProcess.Utte
     }
 
     public void caculate(View view) {
-        int a = 5;
-
         isRecording = false;
         task.cancel();
         mTimer.cancel();
         totalTime = 0;
 
         // 计算结果
-        int totalCount = inputArray.size();
+
+        // 处理结果，保留连续平稳的数据
+
+        // 总数为曲谱音符的个数
+        int totalCount = noteArray.size();
         int targetIndex = 0;
         int rightCount = 0;
+        int inputIndex = 0;
+        for (int i = 0; i < noteArray.size(); i++) {
+            NoteBean targetNote = noteArray.get(i);
+            if (inputIndex >= inputArray.size()) {
+                break;
+            }
+            InputNote inputNote = inputArray.get(inputIndex);
+
+            int inputRightCount = 0;
+            int inputTotalCount = 0;
+
+            while (inputNote.time > targetNote.start && inputNote.time < targetNote.start + targetNote.duration) {
+                // 将单个的错误点纠正
+                if (inputNote.noteName.equals(targetNote.noteName)) {
+                    // 正确
+                    // 判断后面2个数据是否连续
+                    if (inputIndex + 2 < inputArray.size()) {
+                        InputNote inputNote1 = inputArray.get(inputIndex + 1);
+                        InputNote inputNote2 = inputArray.get(inputIndex + 2);
+
+                        if (!inputNote1.noteName.equals(targetNote.noteName) && inputNote2.noteName.equals(targetNote.noteName)) {
+                            // 连续的三个点，当中间的点数据错误，且两边的点数据正确时，将这个点判定为正确数据
+                            inputNote1.noteName = inputNote.noteName;
+                            inputNote1.freq = inputNote.freq;
+                        }
+                    }
+                }
+
+                inputIndex++;
+                if (inputIndex >= inputArray.size()) {
+                    break;
+                }
+                inputNote = inputArray.get(inputIndex);
+            }
+
+//            while (inputNote.time > targetNote.start && inputNote.time < targetNote.start + targetNote.duration) {
+//                // 在标准音时间范围内的输入音符
+//                // 保留连续正确而片段
+//                // 判断连续时，向后计算5各数据点
+//                if (inputNote.noteName.equals(targetNote.noteName)) {
+//                    // 正确
+//                    inputRightCount++;
+//
+//                    // 判断后面数据是否连续
+//
+//                } else {
+//                    // 错误
+//
+//                }
+//
+//                inputTotalCount++;
+//
+//                inputIndex++;
+//                inputNote = inputArray.get(inputIndex);
+//            }
+        }
+
+        int toneRights = 0;
+        int toneTotal = noteArray.size();
+        boolean isToneRight = false;
         for (int i = 0; i < inputArray.size(); i++) {
             InputNote inputNote = inputArray.get(i);
             NoteBean targetNote = noteArray.get(targetIndex);
@@ -425,31 +610,43 @@ public class MainActivity extends AppCompatActivity implements UtterProcess.Utte
             if (inputNote.time >= targetNote.start && inputNote.time <= targetNote.start + targetNote.duration) {
                 if (inputNote.noteName.equalsIgnoreCase(targetNote.noteName)) {
                     rightCount++;
+
+                    if (!isToneRight) {
+                        isToneRight = true;
+                        toneRights++;
+                    }
                 }
             } else {
                 i--;
                 targetIndex++;
+                isToneRight = false;
                 if (targetIndex >= noteArray.size()) {
                     break;
                 }
             }
         }
 
-        float rate = (float)rightCount / (float)totalCount * 100;
+        totalCount = inputArray.size();
+        float rate = (float) rightCount / (float) totalCount * 100;
 
         // 数据造假，给用户一个比较好的结果
-        rate = rate / 0.8f;
+        rate = rate / 0.80f;
         if (rate > 100f) {
             rate = 100f;
         }
 
-        targetTextView.setText("计算结果: " + rate + "%");
+        float toneRate = (float)toneRights / (float)toneTotal * 100;
+
+        targetTextView.setText("计算结果: 节奏准确率: " + rate + "%, 音准正确率: " + toneRate);
     }
 
     public void clear(View view) {
+        if (audioProcess == null) {
+            startAudioDetect();
+        }
         noteIndex = 0;
         inputArray.clear();
-        startAudioDetect();
+
         isRecording = true;
         mTimer = new Timer();
         task = new TimerTask() {
@@ -460,6 +657,7 @@ public class MainActivity extends AppCompatActivity implements UtterProcess.Utte
             }
         };
         mTimer.scheduleAtFixedRate(task, 0, 16);
+
     }
 
     @Override
@@ -467,26 +665,35 @@ public class MainActivity extends AppCompatActivity implements UtterProcess.Utte
         double timeStamp = audioEvent.getTimeStamp();
         audioEvent.getEndTimeStamp();
         float pitch = pitchDetectionResult.getPitch();
+        if (isChecking) {
+            fixPitch = Math.max(fixPitch, pitch);
+            pitchOffset = fixPitch - 261.626f;
+        } else {
+            if (pitch > -2) {
+                final String msg = "pitch = " + pitch + "\ntimeStamp = " + timeStamp + "\ntotalTime = " + totalTime;
+                String noteNames = NoteMap.caculateNoteName((float) (pitch / Math.pow(2, pitchOffset / 12)));
+                String[] notesNameArray = noteNames.split(",");
+                final String noteName = TextUtils.isEmpty(noteNames) ? "" : notesNameArray[0];
 
-        if (pitch > -2) {
-            final String msg = "pitch = " + pitch + "\ntimeStamp = " + timeStamp + "\nendTimeStamp = " + audioEvent.getEndTimeStamp();
-            final String noteName = NoteMap.caculateNoteName(pitch);
-            Log.i("Pitch", msg);
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    mTextView.setText(msg);
-                    noteNameTextView.setText(noteName);
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        mTextView.setText(msg);
+                        noteNameTextView.setText(noteName);
+                    }
+                });
+
+                if (isRecording) {
+                    InputNote note = new InputNote();
+                    note.noteName = noteName;
+                    note.timeStamp = timeStamp;
+                    note.time = totalTime;
+                    note.freq = TextUtils.isEmpty(noteNames) ? 0 : Float.valueOf(notesNameArray[1]);
+
+                    inputArray.add(note);
+                    final String log = "pitch = " + note.freq + ",timeStamp = " + timeStamp + ",totalTime = " + totalTime;
+                    Log.i("PitchDetect", log);
                 }
-            });
-
-            if (isRecording) {
-                InputNote note = new InputNote();
-                note.noteName = noteName;
-                note.timeStamp = timeStamp;
-                note.time = totalTime;
-
-                inputArray.add(note);
             }
         }
     }
@@ -498,12 +705,24 @@ public class MainActivity extends AppCompatActivity implements UtterProcess.Utte
             return;
         }
 
-        NoteBean noteBean = noteArray.get(noteIndex);
+        if (isRecording) {
+            NoteBean noteBean = noteArray.get(noteIndex);
 
-        if (time <= noteBean.start + noteBean.duration) {
-            targetTextView.setText("请弹这个音：" + noteBean.noteName);
-        } else {
-            noteIndex++;
+            if (time <= noteBean.start + noteBean.duration) {
+                clearColors();
+                targetTextView.setText("请弹这个音：" + noteBean.noteName);
+                TextView tv = notesTipsArray.get(noteIndex);
+                tv.setTextColor(Color.GREEN);
+            } else {
+                noteIndex++;
+            }
+        }
+    }
+
+    private void clearColors() {
+        for (int i = 0; i < notesTipsArray.size(); i++) {
+            TextView tv = notesTipsArray.get(i);
+            tv.setTextColor(Color.WHITE);
         }
     }
 
@@ -514,5 +733,111 @@ public class MainActivity extends AppCompatActivity implements UtterProcess.Utte
     @Override
     public void onOnsetChanged(double v1, double v2) {
         Log.i("onOnsetChanged", "v1 = " + v1 + ", v2 = " + v2);
+    }
+
+    // 手动校对音高
+    private float fixPitch = 0;
+    private float pitchOffset = 0;
+    private boolean isChecking = false;
+
+    public void onCheckTone(View view) {
+        isChecking = true;
+    }
+
+    public void onFinishCheckTone(View view) {
+        isChecking = false;
+
+        pitchOffset = (float) (12 * Math.log(fixPitch / 261.626) / Math.log(2));
+        Log.i("onFinishCheckTone", "pitchOffset = " + pitchOffset);
+    }
+
+    public void onResetTone(View view) {
+        fixPitch = 0;
+        pitchOffset = 0;
+    }
+
+    /**
+     * 更新话筒状态
+     */
+    private int BASE = 1;
+    private int SPACE = 100;// 间隔取样时间
+    private MediaRecorder mMediaRecorder;
+    private final Handler mHandler = new Handler();
+    public static final int MAX_LENGTH = 1000 * 60 * 10;// 最大录音时长1000*60*10;
+    private File file;
+
+    private Runnable mUpdateMicStatusTimer = new Runnable() {
+        public void run() {
+            updateMicStatus();
+        }
+    };
+
+    public void startRecord() {
+        // 开始录音
+        /* ①Initial：实例化MediaRecorder对象 */
+        if (mMediaRecorder == null)
+            mMediaRecorder = new MediaRecorder();
+        try {
+            PackageManager m = getPackageManager();
+            String s = getPackageName();
+            PackageInfo p = null;
+            try {
+                p = m.getPackageInfo(s, 0);
+            } catch (PackageManager.NameNotFoundException e) {
+                e.printStackTrace();
+            }
+            String basePath = p.applicationInfo.dataDir;
+            String recordPath = basePath + "/files/" + "vol.amr";
+            file = new File(recordPath);
+            /* ②setAudioSource/setVedioSource */
+            mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);// 设置麦克风
+            /*
+             * ②设置输出文件的格式：THREE_GPP/MPEG-4/RAW_AMR/Default THREE_GPP(3gp格式
+             * ，H263视频/ARM音频编码)、MPEG-4、RAW_AMR(只支持音频且音频编码要求为AMR_NB)
+             */
+            mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.AMR_NB);
+            /* ②设置音频文件的编码：AAC/AMR_NB/AMR_MB/Default 声音的（波形）的采样 */
+            mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.DEFAULT);
+            /* ③准备 */
+            mMediaRecorder.setOutputFile(file.getAbsolutePath());
+            mMediaRecorder.setMaxDuration(MAX_LENGTH);
+            mMediaRecorder.prepare();
+            /* ④开始 */
+            mMediaRecorder.start();
+            // AudioRecord audioRecord.
+            /* 获取开始时间* */
+            // pre=mMediaRecorder.getMaxAmplitude();
+            updateMicStatus();
+        } catch (IllegalStateException e) {
+            Log.i(TAG,
+                    "call startAmr(File mRecAudioFile) failed!"
+                            + e.getMessage());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void updateMicStatus() {
+        if (mMediaRecorder != null) {
+            double ratio = (double) mMediaRecorder.getMaxAmplitude() / BASE;
+            double db = 0;// 分贝
+            if (ratio > 1)
+                db = 20 * Math.log10(ratio);
+            Log.d(TAG, "分贝值：" + db);
+            volumeTextView.setText("分贝值: " + db);
+            mHandler.postDelayed(mUpdateMicStatusTimer, SPACE);
+        }
+    }
+
+    /**
+     * 停止录音
+     */
+    public void stopRecord() {
+        if (mMediaRecorder == null)
+            return;
+        mMediaRecorder.stop();
+        mMediaRecorder.reset();
+        mMediaRecorder.release();
+        mMediaRecorder = null;
     }
 }

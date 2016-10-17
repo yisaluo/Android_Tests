@@ -117,9 +117,10 @@ public class NoteMap {
         if (pitch < 27.5) {
             return "";
         }
-
+        
         int octaveNum = 0;
         int noteIndex = 0;
+        float freq = 0;
         for (; octaveNum < 9; octaveNum++) {
             float baseFreq = 27.5f * (float)(Math.pow(2, octaveNum));
             float minFreq = baseFreq * (1 + 1 / STEP_FREQ) / 2;
@@ -130,7 +131,7 @@ public class NoteMap {
                     float max = (float)(minFreq * Math.pow(STEP_FREQ, j + 1));
                     if (pitch <  max&& pitch >= min) {
                         noteIndex = j;
-
+                        freq = (float)(baseFreq * Math.pow(STEP_FREQ, j));
                         break;
                     }
                 }
@@ -140,7 +141,7 @@ public class NoteMap {
         }
 
         String noteNameInOctave = getNoteNameInOctave(noteIndex);
-        String noteName = String.format("%s/%d", noteNameInOctave, noteIndex > 2 ? octaveNum + 1 : octaveNum);
+        String noteName = String.format("%s/%d,%f", noteNameInOctave, noteIndex > 2 ? octaveNum + 1 : octaveNum, freq);
 
         return noteName;
     }

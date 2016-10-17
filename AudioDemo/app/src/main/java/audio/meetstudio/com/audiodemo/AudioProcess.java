@@ -20,7 +20,7 @@ public class AudioProcess {
     private static final int SAMPLE_RATE = 22050;
     private static final int BUFFER_SIZE = 1024;
 
-    private AudioDispatcher dispatcher;
+    public AudioDispatcher dispatcher;
     private OnFreqChangedListener onFreqChangedListener;
     private OnsetChangedListener onOnsetChangedListener;
 
@@ -42,7 +42,7 @@ public class AudioProcess {
                     }
                 }));
 
-        dispatcher.addAudioProcessor(new BandPass(2600, 2500, SAMPLE_RATE));
+        dispatcher.addAudioProcessor(new BandPass(2600, 2400, SAMPLE_RATE));
 
 
         // add a processor, handle percussion event.
