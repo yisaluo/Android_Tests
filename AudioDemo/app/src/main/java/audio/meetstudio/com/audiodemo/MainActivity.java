@@ -134,12 +134,9 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
             }
         };
 
-
         mTimer = new Timer();
 
         inputArray = new ArrayList<>();
-
-        // startRecord();
 
         notesLayout = (GridLayout) findViewById(R.id.notes_layout);
 
@@ -156,7 +153,6 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
     protected void onDestroy() {
         super.onDestroy();
         audioProcess.stop();
-        stopRecord();
     }
 
     @Override
@@ -213,42 +209,8 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
         audioProcess.start();
     }
 
-//    @Override
-//    public void onPitchChanged(PitchDetectionResult pitchDetectionResult, AudioEvent audioEvent) {
-//        double timeStamp = audioEvent.getTimeStamp();
-//        audioEvent.getEndTimeStamp();
-//        float pitch = pitchDetectionResult.getPitch();
-//
-//        if (pitch > -1) {
-//            final String msg = "pitch = " + pitch + ",timeStamp = " + timeStamp + ",endTimeStamp = " + audioEvent.getEndTimeStamp();
-//            Log.i("PitchDetect", msg);
-//            if (isChecking) {
-//                fixPitch = Math.max(fixPitch, pitch);
-//                pitchOffset = fixPitch - 261.626f;
-//            } else {
-//                String noteNames = NoteMap.caculateNoteName(pitch);
-//                String[] notesNameArray = noteNames.split(",");
-//                final String noteName = notesNameArray[0];
-//                runOnUiThread(new Runnable() {
-//                    @Override
-//                    public void run() {
-//                        mTextView.setText(msg);
-//                        noteNameTextView.setText(noteName);
-//                    }
-//                });
-//            }
-//        }
-//    }
-
     @Override
     public void onNoteLoaded(NoteLoader loader, String notes) {
-//        String abasepath = getFilesDir().getPath();
-//        String toPath = abasepath + "/";  // Your application path
-
-//        player.resetNotes(notes);
-//        player.resetSoundSourcePathUrl(toPath + "merlin_gold.sf2");
-//        player.play(noteLoader.result);
-//        player.start(MainActivity.this);
         Toast.makeText(this, "曲谱已加载", Toast.LENGTH_SHORT).show();
         Gson gson = new Gson();
         musicXMLNote = gson.fromJson(notes, new TypeToken<MusicXMLNote>() {
@@ -331,9 +293,6 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
             }
             InputNote inputNote = inputArray.get(inputIndex);
 
-            int inputRightCount = 0;
-            int inputTotalCount = 0;
-
             while (inputNote.time > targetNote.start && inputNote.time < targetNote.start + targetNote.duration) {
                 // 将单个的错误点纠正
                 if (inputNote.noteName.equals(targetNote.noteName)) {
@@ -357,27 +316,6 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
                 }
                 inputNote = inputArray.get(inputIndex);
             }
-
-//            while (inputNote.time > targetNote.start && inputNote.time < targetNote.start + targetNote.duration) {
-//                // 在标准音时间范围内的输入音符
-//                // 保留连续正确而片段
-//                // 判断连续时，向后计算5各数据点
-//                if (inputNote.noteName.equals(targetNote.noteName)) {
-//                    // 正确
-//                    inputRightCount++;
-//
-//                    // 判断后面数据是否连续
-//
-//                } else {
-//                    // 错误
-//
-//                }
-//
-//                inputTotalCount++;
-//
-//                inputIndex++;
-//                inputNote = inputArray.get(inputIndex);
-//            }
         }
 
         int toneRights = 0;
@@ -415,7 +353,7 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
             rate = 100f;
         }
 
-        float toneRate = (float)toneRights / (float)toneTotal * 100;
+        float toneRate = (float) toneRights / (float) toneTotal * 100;
 
         targetTextView.setText("计算结果: 节奏准确率: " + rate + "%, 音准正确率: " + toneRate);
     }
@@ -437,8 +375,6 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
             }
         };
         mTimer.scheduleAtFixedRate(task, 0, 16);
-
-//        caculateVolumn();
     }
 
     @Override
@@ -507,10 +443,6 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
         }
     }
 
-    private void analyzeData() {
-
-    }
-
     @Override
     public void onOnsetChanged(double v1, double v2) {
         Log.i("onOnsetChanged", "v1 = " + v1 + ", v2 = " + v2);
@@ -537,91 +469,6 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
         pitchOffset = 0;
     }
 
-    /**
-     * 更新话筒状态
-     */
-    private int BASE = 1;
-    private int SPACE = 100;// 间隔取样时间
-    private MediaRecorder mMediaRecorder;
-    private final Handler mHandler = new Handler();
-    public static final int MAX_LENGTH = 1000 * 60 * 10;// 最大录音时长1000*60*10;
-    private File file;
-
-    private Runnable mUpdateMicStatusTimer = new Runnable() {
-        public void run() {
-            updateMicStatus();
-        }
-    };
-
-    public void startRecord() {
-        // 开始录音
-        /* ①Initial：实例化MediaRecorder对象 */
-        if (mMediaRecorder == null)
-            mMediaRecorder = new MediaRecorder();
-        try {
-            PackageManager m = getPackageManager();
-            String s = getPackageName();
-            PackageInfo p = null;
-            try {
-                p = m.getPackageInfo(s, 0);
-            } catch (PackageManager.NameNotFoundException e) {
-                e.printStackTrace();
-            }
-            String basePath = p.applicationInfo.dataDir;
-            String recordPath = basePath + "/files/" + "vol.amr";
-            file = new File(recordPath);
-            /* ②setAudioSource/setVedioSource */
-            mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);// 设置麦克风
-            /*
-             * ②设置输出文件的格式：THREE_GPP/MPEG-4/RAW_AMR/Default THREE_GPP(3gp格式
-             * ，H263视频/ARM音频编码)、MPEG-4、RAW_AMR(只支持音频且音频编码要求为AMR_NB)
-             */
-            mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.AMR_NB);
-            /* ②设置音频文件的编码：AAC/AMR_NB/AMR_MB/Default 声音的（波形）的采样 */
-            mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.DEFAULT);
-            /* ③准备 */
-            mMediaRecorder.setOutputFile(file.getAbsolutePath());
-            mMediaRecorder.setMaxDuration(MAX_LENGTH);
-            mMediaRecorder.prepare();
-            /* ④开始 */
-            mMediaRecorder.start();
-            // AudioRecord audioRecord.
-            /* 获取开始时间* */
-            // pre=mMediaRecorder.getMaxAmplitude();
-            updateMicStatus();
-        } catch (IllegalStateException e) {
-            Log.i(TAG,
-                    "call startAmr(File mRecAudioFile) failed!"
-                            + e.getMessage());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void updateMicStatus() {
-        if (mMediaRecorder != null) {
-            double ratio = (double) mMediaRecorder.getMaxAmplitude() / BASE;
-            double db = 0;// 分贝
-            if (ratio > 1)
-                db = 20 * Math.log10(ratio);
-//            Log.d(TAG, "分贝值：" + db);
-            volumeTextView.setText("分贝值: " + db);
-            mHandler.postDelayed(mUpdateMicStatusTimer, SPACE);
-        }
-    }
-
-    /**
-     * 停止录音
-     */
-    public void stopRecord() {
-        if (mMediaRecorder == null)
-            return;
-        mMediaRecorder.stop();
-        mMediaRecorder.reset();
-        mMediaRecorder.release();
-        mMediaRecorder = null;
-    }
-
     @Override
     public void onByteRead(int length, byte[] audioByteBuffer) {
         // 将 buffer 内容取出，进行平方和运算
@@ -642,8 +489,6 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
                 volumeTextView.setText("分贝值: " + vol);
             }
         });
-
-
     }
 
     public static short getShort(byte[] b, int index) {

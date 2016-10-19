@@ -26,9 +26,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 
-import static audio.meetstudio.com.audiodemo.MyGLSurfaceView.*;
-
-
 /**
  * Created by ChrisDu on 2016/10/17.
  */
@@ -77,7 +74,6 @@ public class SongSelectActivity extends AppCompatActivity implements AdapterView
         songList.add(new SongBean("小星星", "song_xxx.xml"));
         songList.add(new SongBean("匆匆那年", "cong_cong_na_nian.xml"));
         songList.add(new SongBean("Let It Go", "let_it_go.xml"));
-//        songList.add(new SongBean("千与千寻", "qian_yu_qian_xun.xml"));
         songList.add(new SongBean("节奏测试", ""));
         mSongListView = (ListView)findViewById(R.id.song_list);
         mSongListView.setOnItemClickListener(this);
@@ -135,13 +131,6 @@ public class SongSelectActivity extends AppCompatActivity implements AdapterView
         while ((read = in.read(buffer)) != -1) {
             out.write(buffer, 0, read);
         }
-    }
-
-    /**
-     * 显示歌曲列表
-     */
-    public void showSongList() {
-
     }
 
     @Override
