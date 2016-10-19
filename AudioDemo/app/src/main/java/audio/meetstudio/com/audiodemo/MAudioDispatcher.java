@@ -30,7 +30,7 @@ public class MAudioDispatcher implements Runnable {
     private int byteStepSize;
     private long bytesToSkip;
     private long bytesProcessed;
-    private AudioEvent audioEvent;
+    public AudioEvent audioEvent;
     private boolean stopped;
     private boolean zeroPadFirstBuffer;
     private boolean zeroPadLastBuffer;
