@@ -20,6 +20,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.webkit.WebView;
 import android.widget.GridLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -30,11 +31,15 @@ import com.google.gson.reflect.TypeToken;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Timer;
 import java.util.TimerTask;
 
 import be.tarsos.dsp.AudioEvent;
 import be.tarsos.dsp.pitch.PitchDetectionResult;
+
+import static audio.meetstudio.com.audiodemo.StaveViewActivity.dataArray;
+import static audio.meetstudio.com.audiodemo.StaveViewActivity.numNotationMusjeStrWith;
 
 public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLoaderListener, PFMusicXmlPlayer.XmlPlayerListener, AudioProcess.OnFreqChangedListener, AudioProcess.OnsetChangedListener, OnByteReadListener {
 
@@ -118,6 +123,22 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
 
         noteLoader = new NoteLoader(this);
 
+        PackageManager m = getPackageManager();
+        String s = getPackageName();
+        PackageInfo p = null;
+        try {
+            p = m.getPackageInfo(s, 0);
+        } catch (PackageManager.NameNotFoundException e) {
+            e.printStackTrace();
+        }
+        basePath = p.applicationInfo.dataDir;
+
+        AssetsCopyer.releaseAssets(this, "musje", basePath + "/files/");
+
+        initWebView();
+
+        showStave();
+
         // 读取MusicXML数据
         if (!TextUtils.isEmpty(mFileName)) {
             noteLoader.listener = this;
@@ -147,6 +168,12 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
         } else {
             showToast("未获取录音权限");
         }
+    }
+
+    private void showStave() {
+        String url = "file://" + basePath + "/files/musje/musje.html";
+        System.out.print(url);
+        mWebView.loadUrl(url);
     }
 
     @Override
@@ -215,11 +242,14 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
         Gson gson = new Gson();
         musicXMLNote = gson.fromJson(notes, new TypeToken<MusicXMLNote>() {
         }.getType());
-
+        StaveViewActivity.musicXMLNote = musicXMLNote;
         noteArray.clear();
+        dataArray.clear();
         measuresCount = musicXMLNote.getLength();
         MusicXMLNote.MeasuresBean measure = musicXMLNote.getMeasures().get(0);
         tempo = measure.getMeasure_tempo();
+
+        measure.getParts().get(0).getStaves().get(0).getKey();
 
         long tick = 0;
         for (int i = 0; i < musicXMLNote.getMeasures().size(); i++) {
@@ -240,10 +270,11 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
                     long start = tick;
                     int duration = note.getIntrinsicTicks();
                     tick += duration;
-                    NoteBean noteBean = new NoteBean(note.getKeys().get(0), start, duration, note.isRest());
-
+                    NoteBean noteBean = new NoteBean(note.getKeys().get(0), start, duration, note.isRest(), note);
+                    String sub = noteBean.noteName.substring(1, 2);
+                    noteBean.note = NoteConverter.toneFromKey(noteBean.noteName, sub);
                     noteArray.add(noteBean);
-
+                    dataArray.add(noteBean);
                     final TextView noteTextView = new TextView(this);
                     noteTextView.setText(" " + noteBean.noteName + " ");
                     if (noteBean.rest) {
@@ -261,9 +292,31 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
             }
         }
 
+
+
         timePerTick_f = (float) 60 / tempo / quarterDuration;
         ticksPerFrame = (long) (0.016 / timePerTick_f);
         int a = 5;
+
+        if (musicXMLNote != null && noteArray.size() > 0) {
+            String data = numNotationMusjeStrWith(musicXMLNote, noteArray);
+
+            MusicXMLNote.MeasuresBean.PartsBean.StavesBean bean = musicXMLNote.getMeasures().get(0).getParts().get(0).getStaves().get(0);
+
+            String keySigString = "1 = " + bean.getKey();
+            if (keySigString.length() == 0) {
+                keySigString = "1 = C";
+            }
+            final String jsUrl = String.format("javascript:showScoreWithFontSize(\"%s\", \"%s\", %d, %d)", data, keySigString, 400, 15);
+
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    mWebView.loadUrl(jsUrl);
+                }
+            });
+
+        }
     }
 
     @Override
@@ -406,7 +459,7 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
                     note.timeStamp = timeStamp;
                     note.time = totalTime;
                     note.freq = TextUtils.isEmpty(noteNames) ? 0 : Float.valueOf(notesNameArray[1]);
-
+                    note.note = NoteConverter.toneFromKey(noteName, noteName.substring(1, 2));
                     inputArray.add(note);
                     final String log = "pitch = " + note.freq + ",timeStamp = " + timeStamp + ",totalTime = " + totalTime;
                     Log.i("PitchDetect", log);
@@ -493,5 +546,24 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
 
     public static short getShort(byte[] b, int index) {
         return (short) (((b[index + 1] << 8) | b[index + 0] & 0xff));
+    }
+
+    private WebView mWebView;
+    private String basePath = "";
+    private static HashMap<String, String> alterMap = new HashMap<>();
+
+    private void initWebView() {
+        mWebView = (WebView) this.findViewById(R.id.stave_webview);
+
+        mWebView.getSettings().setJavaScriptEnabled(true);
+        mWebView.getSettings().setAllowFileAccess(true);
+        mWebView.getSettings().setAllowContentAccess(true);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            mWebView.getSettings().setAllowFileAccessFromFileURLs(true);
+            mWebView.getSettings().setAllowUniversalAccessFromFileURLs(true);
+        }
+        mWebView.setBackgroundColor(0); // 设置背景色
+        mWebView.getBackground().setAlpha(2); // 设置填充透明度 范围：0-255
+        mWebView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
     }
 }

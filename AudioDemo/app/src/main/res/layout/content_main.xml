@@ -110,16 +110,6 @@
         android:textColor="#ff0000"/>
 
     <TextView
-        android:text="歌曲：小星星    速度：60"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_above="@+id/textView2"
-        android:layout_alignParentLeft="true"
-        android:layout_alignParentStart="true"
-        android:layout_marginBottom="21dp"
-        android:id="@+id/textView3" />
-
-    <TextView
         android:text="音符提示"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -146,5 +136,15 @@
         android:columnCount="10"
         android:layout_below="@+id/textView4"
         android:layout_alignParentLeft="true"
-        android:layout_alignParentStart="true"></GridLayout>
+        android:layout_alignParentStart="true"
+        android:visibility="gone"></GridLayout>
+
+    <WebView
+        android:id="@+id/stave_webview"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:background="@android:color/transparent"
+        android:layout_below="@+id/textView4">
+
+    </WebView>
 </RelativeLayout>

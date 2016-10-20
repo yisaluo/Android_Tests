@@ -75,6 +75,7 @@ public class SongSelectActivity extends AppCompatActivity implements AdapterView
         songList.add(new SongBean("匆匆那年", "cong_cong_na_nian.xml"));
         songList.add(new SongBean("Let It Go", "let_it_go.xml"));
         songList.add(new SongBean("节奏测试", ""));
+        songList.add(new SongBean("曲谱查看", ""));
         mSongListView = (ListView)findViewById(R.id.song_list);
         mSongListView.setOnItemClickListener(this);
         SongListAdapter mAdapter = new SongListAdapter();
@@ -140,8 +141,10 @@ public class SongSelectActivity extends AppCompatActivity implements AdapterView
         intent.putExtra(INTENT_SONG_NAME, bean.mSongName);
         intent.putExtra(INTENT_FILE_NAME, bean.mFileName);
 
-        if (i == songList.size() - 1) {
+        if (i == songList.size() - 2) {
             intent = new Intent(SongSelectActivity.this, RhythmTestActivity.class);
+        } else if (i == songList.size() - 1) {
+            intent = new Intent(SongSelectActivity.this, StaveViewActivity.class);
         }
 
         startActivity(intent);
