@@ -12,6 +12,9 @@ public class NoteBean {
         this.duration = duration;
         this.rest = rest;
         this.notesBean = bean;
+        this.type = 3;  // 0:right, 1:弹晚了, 2:抬早了, 3:wrong
+        this.newInput = false;
+        this.newInputTime = 0;
     }
 
     public String noteName;
@@ -20,4 +23,7 @@ public class NoteBean {
     public boolean rest;
     public int note;
     public MusicXMLNote.MeasuresBean.PartsBean.VoicesBean.NotesBean notesBean;
+    public int type;
+    public boolean newInput;
+    public long newInputTime;
 }

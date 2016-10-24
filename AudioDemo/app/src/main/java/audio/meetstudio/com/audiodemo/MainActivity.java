@@ -20,7 +20,10 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.webkit.WebChromeClient;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.widget.Button;
 import android.widget.GridLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -30,6 +33,7 @@ import com.google.gson.reflect.TypeToken;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Timer;
@@ -52,6 +56,7 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
     private TextView targetTextView = null;
     private TextView volumeTextView = null;
     private GridLayout notesLayout = null;
+    private TextView tempoTextView = null;
 
     // MusicXML数据加载
     private NoteLoader noteLoader;
@@ -91,6 +96,23 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
     private String mSongName;
     private String mFileName;
 
+    private boolean staveShowed = false;
+
+    private int environmentNoiseCount = 0;
+    private int averageNoise = 0;
+    private boolean averageNoiseDone = false;
+    private double preNoise = 0;
+    private double prePreNoise = 0;
+    private int totalRhythmCount = 0;
+    private int averageNoiseCount = 100;
+
+    private NoteBean currentNote = null;
+
+    private int tempoCount = 0;
+    private long tempoTick = 0;
+    private long tempoDuration = 0;
+    private long tempoIndex = 0;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -120,6 +142,7 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
         noteNameTextView = (TextView) findViewById(R.id.note_name);
         targetTextView = (TextView) findViewById(R.id.target);
         volumeTextView = (TextView) findViewById(R.id.textview_volume);
+        tempoTextView = (TextView) findViewById(R.id.tempo);
 
         noteLoader = new NoteLoader(this);
 
@@ -147,9 +170,9 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
 
         handler = new Handler() {
             public void handleMessage(Message msg) {
-                totalTime += ticksPerFrame;
 
-                tick(totalTime);
+
+                tick(totalTime, ticksPerFrame);
 
                 super.handleMessage(msg);
             }
@@ -168,6 +191,37 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
         } else {
             showToast("未获取录音权限");
         }
+
+        ((Button) findViewById(R.id.view_stave)).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (mWebView != null) {
+                    mWebView.setVisibility(mWebView.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+                }
+
+                if (!staveShowed) {
+                    staveShowed = true;
+                    String data = numNotationMusjeStrWith(musicXMLNote, noteArray);
+
+                    MusicXMLNote.MeasuresBean.PartsBean.StavesBean bean = musicXMLNote.getMeasures().get(0).getParts().get(0).getStaves().get(0);
+
+                    String keySigString = "1 = " + bean.getKey();
+                    if (keySigString.length() == 0) {
+                        keySigString = "1 = C";
+                    }
+                    final String jsUrl = String.format("javascript:showScoreWithFontSize(\"%s\", \"%s\", %d, %d)", data, keySigString, 360, 15);
+
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            mWebView.loadUrl(jsUrl);
+                        }
+                    });
+                }
+            }
+        });
+
+//        Toast.makeText(this, "正在检测环境噪音", Toast.LENGTH_SHORT).show();
     }
 
     private void showStave() {
@@ -180,6 +234,27 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
     protected void onDestroy() {
         super.onDestroy();
         audioProcess.stop();
+        if (mWebView != null) {
+            mWebView.destroy();
+            mWebView = null;
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (mWebView != null) {
+            mWebView.onResume();
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        if (mWebView != null) {
+            mWebView.onPause();
+        }
     }
 
     @Override
@@ -198,6 +273,10 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
 
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
+            if (musicXMLNote != null && noteArray.size() > 0) {
+
+            }
+
             return true;
         }
 
@@ -237,7 +316,7 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
     }
 
     @Override
-    public void onNoteLoaded(NoteLoader loader, String notes) {
+    public void onNoteLoaded(final NoteLoader loader, String notes) {
         Toast.makeText(this, "曲谱已加载", Toast.LENGTH_SHORT).show();
         Gson gson = new Gson();
         musicXMLNote = gson.fromJson(notes, new TypeToken<MusicXMLNote>() {
@@ -248,7 +327,6 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
         measuresCount = musicXMLNote.getLength();
         MusicXMLNote.MeasuresBean measure = musicXMLNote.getMeasures().get(0);
         tempo = measure.getMeasure_tempo();
-
         measure.getParts().get(0).getStaves().get(0).getKey();
 
         long tick = 0;
@@ -256,10 +334,14 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
             measure = musicXMLNote.getMeasures().get(i);
             quarterDuration = measure.getDivisions();
             // 一小节对应的时长(ticks)
-            quarterDuration = quarterDuration * 4 / measure.getTime().getBeat_value();
+//            quarterDuration = quarterDuration / measure.getTime().getBeat_value();
             measureDuration = quarterDuration * measure.getTime().getNum_beats();
             // 计算整首歌曲总时长(ticks)
             totalDuration += measureDuration;
+
+            tempoDuration = quarterDuration * 4 / measure.getTime().getBeat_value();
+            tempoCount = measure.getTime().getNum_beats();
+            tempoIndex = 0 - measure.getTime().getNum_beats();
 
             // tick += measureDuration * i;
             for (int j = 0; j < measure.getParts().get(0).getVoices().size(); j++) {
@@ -293,30 +375,17 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
         }
 
 
-
         timePerTick_f = (float) 60 / tempo / quarterDuration;
         ticksPerFrame = (long) (0.016 / timePerTick_f);
         int a = 5;
 
-        if (musicXMLNote != null && noteArray.size() > 0) {
-            String data = numNotationMusjeStrWith(musicXMLNote, noteArray);
-
-            MusicXMLNote.MeasuresBean.PartsBean.StavesBean bean = musicXMLNote.getMeasures().get(0).getParts().get(0).getStaves().get(0);
-
-            String keySigString = "1 = " + bean.getKey();
-            if (keySigString.length() == 0) {
-                keySigString = "1 = C";
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                ((TextView) findViewById(R.id.time)).setText("速度: " + tempo);
             }
-            final String jsUrl = String.format("javascript:showScoreWithFontSize(\"%s\", \"%s\", %d, %d)", data, keySigString, 400, 15);
+        });
 
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    mWebView.loadUrl(jsUrl);
-                }
-            });
-
-        }
     }
 
     @Override
@@ -382,6 +451,32 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
                 if (inputNote.noteName.equalsIgnoreCase(targetNote.noteName)) {
                     rightCount++;
 
+                    if (targetNote.type == 3) {
+                        // 先判断起始时间
+                            if (inputNote.time >= targetNote.start && inputNote.time < targetNote.start + (targetNote.duration) / 4) {
+                            } else {
+                                // late
+                                targetNote.type = 1;
+                            }
+                    }
+
+                    if (targetNote.type == 3) {
+                        if (i + 1 < inputArray.size()) {
+                            InputNote nextNote = inputArray.get(i + 1);
+                            if (nextNote.noteName.equalsIgnoreCase(inputNote.noteName)) {
+
+                            } else {
+                                // 最后一个正确的数据
+                                if (inputNote.time < targetNote.start + targetNote.duration / 2){
+                                    targetNote.type = 2;
+                                }
+                            }
+                        }
+                    }
+
+                    if (targetNote.type == 3)
+                        targetNote.type = 0;
+
                     if (!isToneRight) {
                         isToneRight = true;
                         toneRights++;
@@ -401,20 +496,42 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
         float rate = (float) rightCount / (float) totalCount * 100;
 
         // 数据造假，给用户一个比较好的结果
-        rate = rate / 0.80f;
-        if (rate > 100f) {
+        rate = rate / 0.90f;
+        if (rate > 100f)
+        {
             rate = 100f;
         }
 
         float toneRate = (float) toneRights / (float) toneTotal * 100;
 
-        targetTextView.setText("计算结果: 节奏准确率: " + rate + "%, 音准正确率: " + toneRate);
+        targetTextView.setText("计算结果: 节奏准确率: " + rate + "%\n音准正确率: " + toneRate);
+
+        showNoteResult();
+    }
+
+    private void showNoteResult() {
+        for (int i = 0; i < notesTipsArray.size(); i++) {
+            TextView tv = notesTipsArray.get(i);
+            tv.setTextColor(Color.WHITE);
+
+            NoteBean bean = noteArray.get(i);
+            if (bean.type == 1) {
+                tv.setTextColor(Color.BLUE);
+            } else if (bean.type == 2) {
+                tv.setTextColor(Color.YELLOW);
+            } else if (bean.type == 3) {
+                tv.setTextColor(Color.RED);
+            }
+        }
     }
 
     public void clear(View view) {
         if (audioProcess == null) {
             startAudioDetect();
         }
+
+        clearColors();
+
         noteIndex = 0;
         inputArray.clear();
 
@@ -427,7 +544,7 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
                 handler.sendMessage(message);
             }
         };
-        mTimer.scheduleAtFixedRate(task, 0, 16);
+        mTimer.scheduleAtFixedRate(task, 0, (int)(1f / 60f * 1000));
     }
 
     @Override
@@ -459,16 +576,20 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
                     note.timeStamp = timeStamp;
                     note.time = totalTime;
                     note.freq = TextUtils.isEmpty(noteNames) ? 0 : Float.valueOf(notesNameArray[1]);
-                    note.note = NoteConverter.toneFromKey(noteName, noteName.substring(1, 2));
+                    if (TextUtils.isEmpty(noteName)) {
+                        note.note = 0;
+                    } else {
+                        note.note = NoteConverter.toneFromKey(noteName, noteName.substring(1, 2));
+                    }
                     inputArray.add(note);
                     final String log = "pitch = " + note.freq + ",timeStamp = " + timeStamp + ",totalTime = " + totalTime;
-                    Log.i("PitchDetect", log);
+//                    Log.i("PitchDetect", log);
                 }
             }
         }
     }
 
-    private void tick(long time) {
+    private void tick(long time, long dt) {
         if (noteIndex >= noteArray.size()) {
             caculate(null);
 
@@ -476,23 +597,48 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
         }
 
         if (isRecording) {
-            NoteBean noteBean = noteArray.get(noteIndex);
+            if (tempoIndex >= 0) {
+                totalTime += ticksPerFrame;
+                currentNote = noteArray.get(noteIndex);
 
-            if (time <= noteBean.start + noteBean.duration) {
-                clearColors();
-                targetTextView.setText("请弹这个音：" + noteBean.noteName);
-                TextView tv = notesTipsArray.get(noteIndex);
-                tv.setTextColor(Color.GREEN);
-            } else {
-                noteIndex++;
+                if (totalTime > currentNote.start && totalTime <= currentNote.start + currentNote.duration) {
+
+                    targetTextView.setText("请弹这个音：" + (currentNote.rest ? "" : currentNote.noteName));
+                    TextView tv = notesTipsArray.get(noteIndex);
+                    tv.setTextColor(Color.GREEN);
+
+//                String str = String.format("javascript:colorNote(%d,'%s')", noteIndex + 1, "#00ff00");
+//                if (mWebView != null)
+//                    mWebView.loadUrl(str);
+                } else {
+                    clearColors();
+                    noteIndex++;
+                }
             }
+
+            // 节拍器
+
+            if (tempoTick > tempoDuration) {
+                tempoIndex++;
+                if (tempoIndex >= tempoCount) {
+                    tempoIndex = 0;
+                }
+                tempoTick = 0;
+            }
+            tempoTextView.setText("节拍：" + (tempoIndex + 1));
+            tempoTick += dt;
         }
     }
 
     private void clearColors() {
+        targetTextView.setText("请弹这个音：");
         for (int i = 0; i < notesTipsArray.size(); i++) {
             TextView tv = notesTipsArray.get(i);
             tv.setTextColor(Color.WHITE);
+        }
+
+        for (int i = 0; i < noteArray.size(); i++) {
+            noteArray.get(i).type = 3;
         }
     }
 
@@ -542,6 +688,50 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
                 volumeTextView.setText("分贝值: " + vol);
             }
         });
+
+
+//        // 先检测环境音
+//        if (!averageNoiseDone) {
+//            if (environmentNoiseCount < averageNoiseCount) {
+//                averageNoise += volume;
+//
+//                environmentNoiseCount++;
+//
+//                return;
+//            } else {
+//                averageNoise = averageNoise / averageNoiseCount;
+//                final int noise = averageNoise;
+//                averageNoiseDone = true;
+//                runOnUiThread(new Runnable() {
+//                    @Override
+//                    public void run() {
+//                        Toast.makeText(MainActivity.this, "环境音检测完毕" + noise, Toast.LENGTH_SHORT).show();
+//                    }
+//                });
+//
+//
+//                return;
+//            }
+//        }
+//
+//        // 开始通过音量变化，记录节奏点
+//        if (preNoise - averageNoise > 10 && preNoise > prePreNoise && preNoise > volume) {
+//            // 记录一个节奏点
+//            totalRhythmCount++;
+//
+//            if (currentNote != null && isRecording) {
+//                currentNote.newInputTime = totalTime;
+//                currentNote.newInput = true;
+//            }
+//        }
+//
+//        if (preNoise == 0) {
+//            // 第一次更新
+//            preNoise = volume;
+//        } else {
+//            prePreNoise = preNoise;
+//            preNoise = volume;
+//        }
     }
 
     public static short getShort(byte[] b, int index) {
@@ -558,6 +748,8 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
         mWebView.getSettings().setJavaScriptEnabled(true);
         mWebView.getSettings().setAllowFileAccess(true);
         mWebView.getSettings().setAllowContentAccess(true);
+        mWebView.getSettings().setDomStorageEnabled(true);
+        mWebView.getSettings().setAllowFileAccessFromFileURLs(true);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
             mWebView.getSettings().setAllowFileAccessFromFileURLs(true);
             mWebView.getSettings().setAllowUniversalAccessFromFileURLs(true);
@@ -565,5 +757,15 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
         mWebView.setBackgroundColor(0); // 设置背景色
         mWebView.getBackground().setAlpha(2); // 设置填充透明度 范围：0-255
         mWebView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+        mWebView.setWebViewClient(new MyClient());
+    }
+
+    class MyClient extends WebViewClient {
+
+        @Override
+        public boolean shouldOverrideUrlLoading(WebView view, String url) {
+            Log.i("OverrideUrl", url);
+            return true;//super.shouldOverrideUrlLoading(view, url);
+        }
     }
 }

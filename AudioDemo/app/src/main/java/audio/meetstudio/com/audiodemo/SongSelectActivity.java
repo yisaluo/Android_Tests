@@ -75,7 +75,7 @@ public class SongSelectActivity extends AppCompatActivity implements AdapterView
         songList.add(new SongBean("匆匆那年", "cong_cong_na_nian.xml"));
         songList.add(new SongBean("Let It Go", "let_it_go.xml"));
         songList.add(new SongBean("节奏测试", ""));
-        songList.add(new SongBean("曲谱查看", ""));
+//        songList.add(new SongBean("曲谱查看", ""));
         mSongListView = (ListView)findViewById(R.id.song_list);
         mSongListView.setOnItemClickListener(this);
         SongListAdapter mAdapter = new SongListAdapter();

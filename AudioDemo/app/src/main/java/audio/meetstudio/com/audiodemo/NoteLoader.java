@@ -14,6 +14,7 @@ import android.webkit.WebView;
 public class NoteLoader {
     private static final String APP_CACAHE_DIRNAME = "/webcache";
     public String result = null;
+    private Context mContext;
 
     public interface NoteLoaderListener{
         void onNoteLoaded(NoteLoader loader, String notes);
@@ -22,11 +23,15 @@ public class NoteLoader {
     public NoteLoaderListener listener = null;
     private static WebView webView;
     public NoteLoader(Context context){
-        webView = new WebView(context);
+        mContext = context;
+    }
+
+    public void initWebView() {
+        webView = new WebView(mContext);
         webView.getSettings().setJavaScriptEnabled(true);
         webView.getSettings().setAllowFileAccess(true);
         webView.getSettings().setAllowContentAccess(true);
-        String cacheDirPath = context.getFilesDir().getAbsolutePath()+APP_CACAHE_DIRNAME;
+        String cacheDirPath = mContext.getFilesDir().getAbsolutePath()+APP_CACAHE_DIRNAME;
 //      String cacheDirPath = getCacheDir().getAbsolutePath()+Constant.APP_DB_DIRNAME;
         //设置数据库缓存路径
         webView.getSettings().setDatabasePath(cacheDirPath);
@@ -41,7 +46,9 @@ public class NoteLoader {
         webView.addJavascriptInterface(this, "control");
         webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
     }
+
     public void loadStave(String filename){
+        initWebView();
         String url = "file:///android_asset/octave_json.html" + "?filename=" + filename;
         webView.loadUrl(url);
     }
