@@ -2,9 +2,15 @@ package audio.meetstudio.com.audiodemo;
 
 import android.media.AudioFormat;
 import android.media.AudioRecord;
+import android.media.MediaDataSource;
+import android.media.MediaFormat;
+import android.media.MediaRecorder;
+import android.util.Log;
 
 import be.tarsos.dsp.AudioDispatcher;
 import be.tarsos.dsp.AudioEvent;
+import be.tarsos.dsp.AudioProcessor;
+import be.tarsos.dsp.SilenceDetector;
 import be.tarsos.dsp.filters.BandPass;
 import be.tarsos.dsp.filters.LowPassSP;
 import be.tarsos.dsp.io.TarsosDSPAudioFormat;
@@ -15,6 +21,7 @@ import be.tarsos.dsp.onsets.PercussionOnsetDetector;
 import be.tarsos.dsp.pitch.PitchDetectionHandler;
 import be.tarsos.dsp.pitch.PitchDetectionResult;
 import be.tarsos.dsp.pitch.PitchProcessor;
+import be.tarsos.dsp.util.fft.FFT;
 
 /**
  * Created by ChrisDu on 2016/10/8.
@@ -23,8 +30,7 @@ import be.tarsos.dsp.pitch.PitchProcessor;
 public class AudioProcess {
 
     private static final int SAMPLE_RATE = 22050;
-    public static final int BUFFER_SIZE = AudioRecord.getMinBufferSize(SAMPLE_RATE,
-            AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+    public static final int BUFFER_SIZE = 1024;//AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
 
     public MAudioDispatcher dispatcher;
     private OnFreqChangedListener onFreqChangedListener;
@@ -34,6 +40,8 @@ public class AudioProcess {
     private double sensitivity = 5.0;
     private double threshold = 0.5;
 
+    SilenceDetector silenceDetector;
+
     public AudioProcess(OnByteReadListener listener) {
 
 //        dispatcher = AudioDispatcherFactory
@@ -41,7 +49,7 @@ public class AudioProcess {
         int var3 = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
         int var4 = var3 / 2;
         if (var4 <= BUFFER_SIZE) {
-            this.mAudioRecord = new AudioRecord(1, SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, BUFFER_SIZE);
+            this.mAudioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, BUFFER_SIZE);
             TarsosDSPAudioFormat format = new TarsosDSPAudioFormat((float) SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, true, false);
             AndroidAudioInputStream inputSteam = new AndroidAudioInputStream(mAudioRecord, format);
             mAudioRecord.startRecording();
@@ -62,18 +70,53 @@ public class AudioProcess {
                     }
                 }));
 
-//        dispatcher.addAudioProcessor(new BandPass(2600, 2400, SAMPLE_RATE));
+        // 添加带通滤波
+         dispatcher.addAudioProcessor(new BandPass(2600, 2400, SAMPLE_RATE));
 
+        // 添加FFT变换
+         dispatcher.addAudioProcessor(fftProcessor);
+
+        // 声音检测
+        silenceDetector = new SilenceDetector(-80, false);
+        dispatcher.addAudioProcessor(silenceDetector);
 
         // add a processor, handle percussion event.
-        dispatcher.addAudioProcessor(new PercussionOnsetDetector(SAMPLE_RATE,
-                BUFFER_SIZE, new OnsetHandler() {
-            @Override
-            public void handleOnset(double v, double v1) {
-                onOnsetChangedListener.onOnsetChanged(v, v1);
-            }
-        }, sensitivity, threshold));
+//        dispatcher.addAudioProcessor(new PercussionOnsetDetector(SAMPLE_RATE,
+//                BUFFER_SIZE, new OnsetHandler() {
+//            @Override
+//            public void handleOnset(double v, double v1) {
+//                onOnsetChangedListener.onOnsetChanged(v, v1);
+//            }
+//        }, sensitivity, threshold));
     }
+
+    AudioProcessor fftProcessor = new AudioProcessor(){
+
+        FFT fft = new FFT(BUFFER_SIZE);
+        float[] amplitudes = new float[BUFFER_SIZE / 2];
+
+        @Override
+        public void processingFinished() {
+            // TODO Auto-generated method stub
+        }
+
+        @Override
+        public boolean process(AudioEvent audioEvent) {
+            Log.i("process", "Begin" + System.currentTimeMillis());
+            float[] audioFloatBuffer = audioEvent.getFloatBuffer();
+            float[] transformbuffer = new float[BUFFER_SIZE * 2];
+            System.arraycopy(audioFloatBuffer, 0, transformbuffer, 0, audioFloatBuffer.length);
+            fft.forwardTransform(transformbuffer);
+            fft.modulus(transformbuffer, amplitudes);
+//            panel.drawFFT(pitch, amplitudes,fft);
+//            panel.repaint();
+
+            Log.i("process", "End" + System.currentTimeMillis());
+
+            return true;
+        }
+
+    };
 
     public void start() {
         try {
@@ -106,5 +149,13 @@ public class AudioProcess {
 
     public AudioRecord getAudioRecord() {
         return mAudioRecord;
+    }
+
+    public double getCurrentdBSPL() {
+        if (silenceDetector != null) {
+            return silenceDetector.currentSPL();
+        }
+
+        return 0;
     }
 }

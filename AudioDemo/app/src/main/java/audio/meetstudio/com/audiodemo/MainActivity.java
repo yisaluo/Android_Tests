@@ -40,7 +40,10 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 import be.tarsos.dsp.AudioEvent;
+import be.tarsos.dsp.AudioProcessor;
 import be.tarsos.dsp.pitch.PitchDetectionResult;
+import be.tarsos.dsp.util.fft.FFT;
+import ca.uol.aig.fftpack.RealDoubleFFT;
 
 import static audio.meetstudio.com.audiodemo.StaveViewActivity.dataArray;
 import static audio.meetstudio.com.audiodemo.StaveViewActivity.numNotationMusjeStrWith;
@@ -165,13 +168,11 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
         // 读取MusicXML数据
         if (!TextUtils.isEmpty(mFileName)) {
             noteLoader.listener = this;
-            noteLoader.loadStave(mFileName);
+             noteLoader.loadStave(mFileName);
         }
 
         handler = new Handler() {
             public void handleMessage(Message msg) {
-
-
                 tick(totalTime, ticksPerFrame);
 
                 super.handleMessage(msg);
@@ -227,7 +228,9 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
     private void showStave() {
         String url = "file://" + basePath + "/files/musje/musje.html";
         System.out.print(url);
-        mWebView.loadUrl(url);
+        if (mWebView != null) {
+            mWebView.loadUrl(url);
+        }
     }
 
     @Override
@@ -311,7 +314,7 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
     private void startAudioDetect() {
         audioProcess = new AudioProcess(this);
         audioProcess.setOnFreqChangedListener(this);
-        audioProcess.setOnsetChangedListener(this);
+//        audioProcess.setOnsetChangedListener(this);
         audioProcess.start();
     }
 
@@ -453,11 +456,11 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
 
                     if (targetNote.type == 3) {
                         // 先判断起始时间
-                            if (inputNote.time >= targetNote.start && inputNote.time < targetNote.start + (targetNote.duration) / 4) {
-                            } else {
-                                // late
-                                targetNote.type = 1;
-                            }
+                        if (inputNote.time >= targetNote.start && inputNote.time < targetNote.start + (targetNote.duration) / 4) {
+                        } else {
+                            // late
+                            targetNote.type = 1;
+                        }
                     }
 
                     if (targetNote.type == 3) {
@@ -467,7 +470,7 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
 
                             } else {
                                 // 最后一个正确的数据
-                                if (inputNote.time < targetNote.start + targetNote.duration / 2){
+                                if (inputNote.time < targetNote.start + targetNote.duration / 2) {
                                     targetNote.type = 2;
                                 }
                             }
@@ -497,8 +500,7 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
 
         // 数据造假，给用户一个比较好的结果
         rate = rate / 0.90f;
-        if (rate > 100f)
-        {
+        if (rate > 100f) {
             rate = 100f;
         }
 
@@ -544,13 +546,13 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
                 handler.sendMessage(message);
             }
         };
-        mTimer.scheduleAtFixedRate(task, 0, (int)(1f / 60f * 1000));
+        int interval = (int) (1f / 60f * 1000);
+        mTimer.scheduleAtFixedRate(task, 0, interval);
     }
 
     @Override
     public void onFreqChanged(PitchDetectionResult pitchDetectionResult, AudioEvent audioEvent) {
         double timeStamp = audioEvent.getTimeStamp();
-        audioEvent.getEndTimeStamp();
         float pitch = pitchDetectionResult.getPitch();
         if (isChecking) {
             fixPitch = Math.max(fixPitch, pitch);
@@ -668,8 +670,13 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
         pitchOffset = 0;
     }
 
+    private RealDoubleFFT trasformer;
+    double[] toTransform;
+
     @Override
     public void onByteRead(int length, byte[] audioByteBuffer) {
+
+
         // 将 buffer 内容取出，进行平方和运算
         int r = length;
         long v = 0;
@@ -678,6 +685,25 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
             short value = getShort(audioByteBuffer, i);
             v += value * value;
         }
+
+//        toTransform = new double[audioByteBuffer.length / 2];
+//        if (trasformer == null) {
+//            trasformer = new RealDoubleFFT(audioByteBuffer.length / 2);
+//        }
+//
+//        for (int i = 0; i < audioByteBuffer.length / 2 && i < length; i += 2) {
+//            toTransform[i] = (double) getShort(audioByteBuffer, i) / 32768.0;
+//        }
+//        // TODO
+//        trasformer.ft(toTransform);
+
+//        for (int i = 0; i < toTransform.length; i++) {
+//            int x = i;
+//            int downy = (int) (100 - (toTransform[i] * 10));
+//            int upy = 100;
+//            Log.i("drawLine", String.format("i = %d, x = %d, downy = %d, upy = %d", i, x, downy, upy));
+//        }
+
         // 平方和除以数据总长度，得到音量大小。
         double mean = v / (double) r;
         final double volume = 10 * Math.log10(mean);
@@ -686,6 +712,7 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
             @Override
             public void run() {
                 volumeTextView.setText("分贝值: " + vol);
+                Log.i("SilenceDetector", "currentdBSPL = " + audioProcess.getCurrentdBSPL());
             }
         });
 

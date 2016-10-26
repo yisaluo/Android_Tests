@@ -47,6 +47,8 @@
         <activity
             android:name=".StaveViewActivity"
             android:theme="@style/AppTheme.NoActionBar"></activity>
+        <activity android:name=".FFTActivity"></activity>
+
     </application>
 
 </manifest>

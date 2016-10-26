@@ -26,6 +26,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 
+import be.tarsos.dsp.util.fft.FFT;
+
 /**
  * Created by ChrisDu on 2016/10/17.
  */
@@ -75,8 +77,9 @@ public class SongSelectActivity extends AppCompatActivity implements AdapterView
         songList.add(new SongBean("匆匆那年", "cong_cong_na_nian.xml"));
         songList.add(new SongBean("Let It Go", "let_it_go.xml"));
         songList.add(new SongBean("节奏测试", ""));
+        songList.add(new SongBean("FFT测试", ""));
 //        songList.add(new SongBean("曲谱查看", ""));
-        mSongListView = (ListView)findViewById(R.id.song_list);
+        mSongListView = (ListView) findViewById(R.id.song_list);
         mSongListView.setOnItemClickListener(this);
         SongListAdapter mAdapter = new SongListAdapter();
         mSongListView.setAdapter(mAdapter);
@@ -141,10 +144,12 @@ public class SongSelectActivity extends AppCompatActivity implements AdapterView
         intent.putExtra(INTENT_SONG_NAME, bean.mSongName);
         intent.putExtra(INTENT_FILE_NAME, bean.mFileName);
 
-        if (i == songList.size() - 2) {
+        if (i == songList.size() - 3) {
             intent = new Intent(SongSelectActivity.this, RhythmTestActivity.class);
-        } else if (i == songList.size() - 1) {
+        } else if (i == songList.size() - 2) {
             intent = new Intent(SongSelectActivity.this, StaveViewActivity.class);
+        } else if (i == songList.size() - 1) {
+            intent = new Intent(SongSelectActivity.this, FFTActivity.class);
         }
 
         startActivity(intent);
@@ -174,13 +179,13 @@ public class SongSelectActivity extends AppCompatActivity implements AdapterView
                 view = new LinearLayout(SongSelectActivity.this.getBaseContext());
 
                 TextView name = new TextView(SongSelectActivity.this);
-                ((LinearLayout)view).addView(name);
+                ((LinearLayout) view).addView(name);
                 holder = new SongHolder();
                 holder.songName = name;
 
                 view.setTag(holder);
             } else {
-                holder = (SongHolder)view.getTag();
+                holder = (SongHolder) view.getTag();
             }
 
             SongBean bean = songList.get(i);
@@ -221,8 +226,9 @@ public class SongSelectActivity extends AppCompatActivity implements AdapterView
     //------------------
     // GLSurfaceView
     private MyGLSurfaceView myGLSurfaceView;
+
     private void initMyGLSurfaceView() {
-        myGLSurfaceView = (MyGLSurfaceView)findViewById(R.id.my_surfaceview);
+        myGLSurfaceView = (MyGLSurfaceView) findViewById(R.id.my_surfaceview);
         myGLSurfaceView.initMyRenderer();
     }
 }
