@@ -712,7 +712,7 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
             @Override
             public void run() {
                 volumeTextView.setText("分贝值: " + vol);
-                Log.i("SilenceDetector", "currentdBSPL = " + audioProcess.getCurrentdBSPL());
+//                Log.i("SilenceDetector", "currentdBSPL = " + audioProcess.getCurrentdBSPL());
             }
         });
 

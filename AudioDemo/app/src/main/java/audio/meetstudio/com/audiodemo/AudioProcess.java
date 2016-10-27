@@ -30,7 +30,7 @@ import be.tarsos.dsp.util.fft.FFT;
 public class AudioProcess {
 
     private static final int SAMPLE_RATE = 22050;
-    public static final int BUFFER_SIZE = 1024;//AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+    public static final int BUFFER_SIZE = 1024; //AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
 
     public MAudioDispatcher dispatcher;
     private OnFreqChangedListener onFreqChangedListener;
@@ -102,7 +102,7 @@ public class AudioProcess {
 
         @Override
         public boolean process(AudioEvent audioEvent) {
-            Log.i("process", "Begin" + System.currentTimeMillis());
+//            Log.i("process", "Begin" + System.currentTimeMillis());
             float[] audioFloatBuffer = audioEvent.getFloatBuffer();
             float[] transformbuffer = new float[BUFFER_SIZE * 2];
             System.arraycopy(audioFloatBuffer, 0, transformbuffer, 0, audioFloatBuffer.length);
@@ -111,7 +111,7 @@ public class AudioProcess {
 //            panel.drawFFT(pitch, amplitudes,fft);
 //            panel.repaint();
 
-            Log.i("process", "End" + System.currentTimeMillis());
+//            Log.i("process", "End" + System.currentTimeMillis());
 
             return true;
         }
