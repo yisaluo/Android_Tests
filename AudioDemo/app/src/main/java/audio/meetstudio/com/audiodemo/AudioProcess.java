@@ -42,6 +42,8 @@ public class AudioProcess {
 
     SilenceDetector silenceDetector;
 
+    private OnFFTTransformedListener onFFTTransformedListener;
+
     public AudioProcess(OnByteReadListener listener) {
 
 //        dispatcher = AudioDispatcherFactory
@@ -71,7 +73,7 @@ public class AudioProcess {
                 }));
 
         // 添加带通滤波
-         dispatcher.addAudioProcessor(new BandPass(2600, 2400, SAMPLE_RATE));
+//         dispatcher.addAudioProcessor(new BandPass(2600, 2400, SAMPLE_RATE));
 
         // 添加FFT变换
          dispatcher.addAudioProcessor(fftProcessor);
@@ -108,10 +110,17 @@ public class AudioProcess {
             System.arraycopy(audioFloatBuffer, 0, transformbuffer, 0, audioFloatBuffer.length);
             fft.forwardTransform(transformbuffer);
             fft.modulus(transformbuffer, amplitudes);
+
+
+
 //            panel.drawFFT(pitch, amplitudes,fft);
 //            panel.repaint();
 
 //            Log.i("process", "End" + System.currentTimeMillis());
+
+            if (onFFTTransformedListener != null) {
+                onFFTTransformedListener.onFFTTransformed(0, amplitudes, fft);
+            }
 
             return true;
         }
@@ -157,5 +166,13 @@ public class AudioProcess {
         }
 
         return 0;
+    }
+
+    public interface OnFFTTransformedListener {
+        void onFFTTransformed(float pitch, float[] amplitudes, FFT fft);
+    }
+
+    public void setOnFFTTransformedListener(OnFFTTransformedListener listener) {
+        this.onFFTTransformedListener = listener;
     }
 }

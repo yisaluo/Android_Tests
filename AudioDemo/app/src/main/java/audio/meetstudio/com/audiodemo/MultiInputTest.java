@@ -36,7 +36,7 @@ import be.tarsos.dsp.util.fft.FFT;
 
 import static audio.meetstudio.com.audiodemo.StaveViewActivity.dataArray;
 
-public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLoaderListener, PFMusicXmlPlayer.XmlPlayerListener, AudioProcess.OnFreqChangedListener, AudioProcess.OnsetChangedListener, OnByteReadListener, AudioProcess.OnFFTTransformedListener {
+public class MultiInputTest extends AppCompatActivity implements NoteLoader.NoteLoaderListener, PFMusicXmlPlayer.XmlPlayerListener, AudioProcess.OnFreqChangedListener, AudioProcess.OnsetChangedListener, OnByteReadListener, AudioProcess.OnFFTTransformedListener {
 
     private final static String TAG = "AudioDemo";
 
@@ -84,9 +84,6 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
 
     private boolean isRecording = false;
 
-    private String mSongName;
-    private String mFileName;
-
     private boolean staveShowed = false;
 
     private int environmentNoiseCount = 0;
@@ -104,10 +101,25 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
     private long tempoDuration = 0;
     private long tempoIndex = 0;
 
+    //    private int[] notesInt = {60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72};
+    private int[][] notes = {
+            {60, 64, 69, 72},
+            {60, 69},
+            {72, 81},
+            {72, 79, 81},
+    };
+    private int notesArrayIndex = 0;
+    private int[] notesInt = {60, 64, 69, 72};
+
+    private ArrayList<TextView> textViews = new ArrayList<>();
+
+    private double preVolume = 0;
+    private boolean isVolumeRaise = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.multiinput_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
@@ -119,15 +131,6 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
                         .setAction("Action", null).show();
             }
         });
-
-        Intent intent = getIntent();
-        if (intent.hasExtra(SongSelectActivity.INTENT_SONG_NAME)) {
-            mSongName = intent.getStringExtra(SongSelectActivity.INTENT_SONG_NAME);
-        }
-
-        if (intent.hasExtra(SongSelectActivity.INTENT_FILE_NAME)) {
-            mFileName = intent.getStringExtra(SongSelectActivity.INTENT_FILE_NAME);
-        }
 
         mTextView = (TextView) findViewById(R.id.note_pitch);
         noteNameTextView = (TextView) findViewById(R.id.note_name);
@@ -149,12 +152,6 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
 
         AssetsCopyer.releaseAssets(this, "musje", basePath + "/files/");
 
-        // 读取MusicXML数据
-        if (!TextUtils.isEmpty(mFileName)) {
-            noteLoader.listener = this;
-             noteLoader.loadStave(mFileName);
-        }
-
         handler = new Handler() {
             public void handleMessage(Message msg) {
                 tick(totalTime, ticksPerFrame);
@@ -168,6 +165,53 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
         inputArray = new ArrayList<>();
 
         notesLayout = (GridLayout) findViewById(R.id.notes_layout);
+        TextView tv1 = new TextView(this);
+        tv1.setText(" C4 ");
+        notesLayout.addView(tv1);
+//        TextView tv2 = new TextView(this); tv2.setText(" #C4 ");
+//        notesLayout.addView(tv2);
+//        TextView tv3 = new TextView(this); tv3.setText(" D4 ");
+//        notesLayout.addView(tv3);
+//        TextView tv4 = new TextView(this); tv4.setText(" #D4 ");
+//        notesLayout.addView(tv4);
+        TextView tv5 = new TextView(this);
+        tv5.setText(" E4 ");
+        notesLayout.addView(tv5);
+//        TextView tv6 = new TextView(this); tv6.setText(" F4 ");
+//        notesLayout.addView(tv6);
+//        TextView tv7 = new TextView(this); tv7.setText(" #F4 ");
+//        notesLayout.addView(tv7);
+//        TextView tv8 = new TextView(this); tv8.setText(" G4 ");
+//        notesLayout.addView(tv8);
+//        TextView tv9 = new TextView(this); tv9.setText(" #G4 ");
+//        notesLayout.addView(tv9);
+        TextView tv10 = new TextView(this);
+        tv10.setText(" A4 ");
+        notesLayout.addView(tv10);
+//        TextView tv11 = new TextView(this); tv11.setText(" #A4 ");
+//        notesLayout.addView(tv11);
+//        TextView tv12 = new TextView(this); tv12.setText(" B4 ");
+//        notesLayout.addView(tv12);
+        TextView tv13 = new TextView(this);
+        tv13.setText(" C5 ");
+        notesLayout.addView(tv13);
+
+        textViews.add(tv1);
+//        textViews.add(tv2);
+//        textViews.add(tv3);
+//        textViews.add(tv4);
+        textViews.add(tv5);
+//        textViews.add(tv6);
+//        textViews.add(tv7);
+//        textViews.add(tv8);
+//        textViews.add(tv9);
+        textViews.add(tv10);
+//        textViews.add(tv11);
+//        textViews.add(tv12);
+        textViews.add(tv13);
+
+        // 显示提示
+        ((TextView) findViewById(R.id.textView4)).setText("请按下提示中的一个音或几个音");
 
         startAudioDetect();
     }
@@ -204,10 +248,6 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
 
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
-            if (musicXMLNote != null && noteArray.size() > 0) {
-
-            }
-
             return true;
         }
 
@@ -472,7 +512,7 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
                     @Override
                     public void run() {
                         mTextView.setText(msg);
-                        noteNameTextView.setText(noteName);
+                        noteNameTextView.setText("单音： " + noteName);
                     }
                 });
 
@@ -592,6 +632,15 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
             public void run() {
                 volumeTextView.setText("分贝值: " + vol);
 //                Log.i("SilenceDetector", "currentdBSPL = " + audioProcess.getCurrentdBSPL());
+
+                double currentDb = audioProcess.getCurrentdBSPL();
+                if (currentDb >= preVolume) {
+                    isVolumeRaise = true;
+                } else {
+                    isVolumeRaise = false;
+                }
+
+                preVolume = currentDb;
             }
         });
     }
@@ -605,28 +654,74 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
 
     @Override
     public void onFFTTransformed(float pitch, float[] amplitudes, FFT fft) {
-        boolean[] isTouched = {false, false, false};
-        int[] notes = {72, 79, 84 };
 
+        double max = 0;
         float delta = 22050f / 1024f;
-        for (int i = 0; i < notes.length; i++) {
-            float freq = NoteMap.getPitchOfNote(notes[i]);
-            int index = (int)(freq / delta);
-            float value = i > 0 ? 1.f : 0.3f;
+
+        for (int i = 0; i < notesInt.length; i++) {
+            int note = notesInt[i];
+            float freq = NoteMap.getPitchOfNote(notesInt[i]);
+            int index = (int) (freq / delta) + 1;
             if (index >= 1 && index < amplitudes.length - 1) {
-                if (amplitudes[index] > value || amplitudes[index - 1] > value || amplitudes[index + 1] > value) {
-                    isTouched[i] = true;
-                }
+                max = Math.max(amplitudes[index + 1], max);
             }
         }
 
-        if (isTouched[0] && isTouched[1] && isTouched[2]) {
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    Toast.makeText(MainActivity.this, "三个音都对了", Toast.LENGTH_SHORT).show();
+        if (isVolumeRaise) {
+
+            for (int i = 0; i < notesInt.length && i < textViews.size(); i++) {
+                float freq = NoteMap.getPitchOfNote(notesInt[i]);
+                int index = (int) (freq / delta);
+                float value = 0.6f;
+                if (index >= 2 && index < amplitudes.length - 1) {
+                    final TextView tv = textViews.get(i);
+                    if (amplitudes[index] > value
+                            && ((amplitudes[index] > amplitudes[index - 1] && amplitudes[index] > amplitudes[index + 1])
+                                || (amplitudes[index - 1] > amplitudes[index - 2] && amplitudes[index - 1] > amplitudes[index])
+                                || (amplitudes[index + 1] > amplitudes[index] && amplitudes[index + 1] > amplitudes[index + 2]))) {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                tv.setTextColor(Color.GREEN);
+                            }
+                        });
+
+                    } else {
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                tv.setTextColor(Color.WHITE);
+                            }
+                        });
+                    }
                 }
-            });
+            }
+        }
+    }
+
+    public void nextNotes(View view) {
+        notesArrayIndex++;
+        if (notesArrayIndex >= notes.length) {
+            notesArrayIndex = 0;
+        }
+
+        notesInt = notes[notesArrayIndex];
+
+        // 更新界面
+        notesLayout.removeAllViews();
+        textViews.clear();
+
+        for (int i = 0; i < notesInt.length; i++) {
+            int note = notesInt[i];
+            float pitch = NoteMap.getPitchOfNote(note);
+            String noteInfo = NoteMap.caculateNoteName(pitch);
+            String noteName = noteInfo.split(",")[0];
+
+            TextView tv = new TextView(this);
+            tv.setText(" " + noteName + " ");
+
+            textViews.add(tv);
+            notesLayout.addView(tv);
         }
     }
 }

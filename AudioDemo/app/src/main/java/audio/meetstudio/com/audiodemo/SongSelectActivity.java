@@ -1,8 +1,11 @@
 package audio.meetstudio.com.audiodemo;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
@@ -18,6 +21,7 @@ import android.widget.BaseAdapter;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -78,12 +82,44 @@ public class SongSelectActivity extends AppCompatActivity implements AdapterView
         songList.add(new SongBean("Let It Go", "let_it_go.xml"));
         songList.add(new SongBean("节奏测试", ""));
         songList.add(new SongBean("FFT测试", ""));
+        songList.add(new SongBean("单、多音测试", ""));
 //        songList.add(new SongBean("曲谱查看", ""));
         mSongListView = (ListView) findViewById(R.id.song_list);
         mSongListView.setOnItemClickListener(this);
         SongListAdapter mAdapter = new SongListAdapter();
         mSongListView.setAdapter(mAdapter);
         mAdapter.notifyDataSetChanged();
+
+        if (hasRecordingPermission()) {
+            showToast("已获取录音权限");
+        } else {
+            showToast("未获取录音权限");
+        }
+    }
+
+    /**
+     * 判断是否有录音权限
+     *
+     * @return
+     */
+    private boolean hasRecordingPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 0);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * 显示Toast提示
+     *
+     * @param msg
+     */
+    private void showToast(String msg) {
+        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
     }
 
     @Override
@@ -147,9 +183,9 @@ public class SongSelectActivity extends AppCompatActivity implements AdapterView
         if (i == songList.size() - 3) {
             intent = new Intent(SongSelectActivity.this, RhythmTestActivity.class);
         } else if (i == songList.size() - 2) {
-            intent = new Intent(SongSelectActivity.this, StaveViewActivity.class);
-        } else if (i == songList.size() - 1) {
             intent = new Intent(SongSelectActivity.this, FFTActivity.class);
+        } else if (i == songList.size() - 1) {
+            intent = new Intent(SongSelectActivity.this, MultiInputTest.class);
         }
 
         startActivity(intent);

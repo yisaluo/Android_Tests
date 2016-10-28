@@ -48,7 +48,9 @@
             android:name=".StaveViewActivity"
             android:theme="@style/AppTheme.NoActionBar"></activity>
         <activity android:name=".FFTActivity"></activity>
-
+        <activity
+            android:name=".MultiInputTest"
+            android:theme="@style/AppTheme.NoActionBar"></activity>
     </application>
 
 </manifest>
