@@ -218,7 +218,7 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
         audioProcess = new AudioProcess(this);
         audioProcess.setOnFreqChangedListener(this);
         audioProcess.setOnFFTTransformedListener(this);
-//        audioProcess.setOnsetChangedListener(this);
+        audioProcess.setOnsetChangedListener(this);
         audioProcess.start();
     }
 

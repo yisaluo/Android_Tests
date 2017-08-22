@@ -83,13 +83,13 @@ public class AudioProcess {
         dispatcher.addAudioProcessor(silenceDetector);
 
         // add a processor, handle percussion event.
-//        dispatcher.addAudioProcessor(new PercussionOnsetDetector(SAMPLE_RATE,
-//                BUFFER_SIZE, new OnsetHandler() {
-//            @Override
-//            public void handleOnset(double v, double v1) {
-//                onOnsetChangedListener.onOnsetChanged(v, v1);
-//            }
-//        }, sensitivity, threshold));
+        dispatcher.addAudioProcessor(new PercussionOnsetDetector(SAMPLE_RATE,
+                BUFFER_SIZE, new OnsetHandler() {
+            @Override
+            public void handleOnset(double v, double v1) {
+                onOnsetChangedListener.onOnsetChanged(v, v1);
+            }
+        }, sensitivity, threshold));
     }
 
     AudioProcessor fftProcessor = new AudioProcessor(){
