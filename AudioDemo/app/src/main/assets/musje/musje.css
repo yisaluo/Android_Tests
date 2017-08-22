@@ -1,0 +1,45 @@
+
+.musje line {
+  stroke: black;
+}
+
+.mus-error {
+  fill: red;
+}
+
+.mus-playing,
+.mus-playing line {
+  fill: #d0e;
+  stroke: #d0e;
+}
+
+.mus-black {
+    fill:black;
+    stroke:black;
+}
+
+.mus-blue {
+    fill: #00ffff;
+    stroke: #00ffff;
+}
+
+.mus-green {
+    fill:#5ee639;
+    stroke:#5ee639;
+}
+
+.mus-red {
+    fill:#ff3737;
+    stroke:#ff3737;
+}
+
+.mus-purple {
+    
+    fill:#db32ff;
+    stroke:#db32ff;
+}
+
+.mus-cyan {
+    fill:#23a4ff;
+    stroke:#23a4ff;
+}

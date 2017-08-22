@@ -1,8 +1,11 @@
 package audio.meetstudio.com.audiodemo;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.design.widget.FloatingActionButton;
@@ -18,6 +21,7 @@ import android.widget.BaseAdapter;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -25,6 +29,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
+
+import be.tarsos.dsp.util.fft.FFT;
 
 /**
  * Created by ChrisDu on 2016/10/17.
@@ -75,11 +81,45 @@ public class SongSelectActivity extends AppCompatActivity implements AdapterView
         songList.add(new SongBean("匆匆那年", "cong_cong_na_nian.xml"));
         songList.add(new SongBean("Let It Go", "let_it_go.xml"));
         songList.add(new SongBean("节奏测试", ""));
-        mSongListView = (ListView)findViewById(R.id.song_list);
+        songList.add(new SongBean("FFT测试", ""));
+        songList.add(new SongBean("单、多音测试", ""));
+//        songList.add(new SongBean("曲谱查看", ""));
+        mSongListView = (ListView) findViewById(R.id.song_list);
         mSongListView.setOnItemClickListener(this);
         SongListAdapter mAdapter = new SongListAdapter();
         mSongListView.setAdapter(mAdapter);
         mAdapter.notifyDataSetChanged();
+
+        if (hasRecordingPermission()) {
+            showToast("已获取录音权限");
+        } else {
+            showToast("未获取录音权限");
+        }
+    }
+
+    /**
+     * 判断是否有录音权限
+     *
+     * @return
+     */
+    private boolean hasRecordingPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, 0);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * 显示Toast提示
+     *
+     * @param msg
+     */
+    private void showToast(String msg) {
+        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
     }
 
     @Override
@@ -140,8 +180,12 @@ public class SongSelectActivity extends AppCompatActivity implements AdapterView
         intent.putExtra(INTENT_SONG_NAME, bean.mSongName);
         intent.putExtra(INTENT_FILE_NAME, bean.mFileName);
 
-        if (i == songList.size() - 1) {
+        if (i == songList.size() - 3) {
             intent = new Intent(SongSelectActivity.this, RhythmTestActivity.class);
+        } else if (i == songList.size() - 2) {
+            intent = new Intent(SongSelectActivity.this, FFTActivity.class);
+        } else if (i == songList.size() - 1) {
+            intent = new Intent(SongSelectActivity.this, MultiInputTest.class);
         }
 
         startActivity(intent);
@@ -171,13 +215,13 @@ public class SongSelectActivity extends AppCompatActivity implements AdapterView
                 view = new LinearLayout(SongSelectActivity.this.getBaseContext());
 
                 TextView name = new TextView(SongSelectActivity.this);
-                ((LinearLayout)view).addView(name);
+                ((LinearLayout) view).addView(name);
                 holder = new SongHolder();
                 holder.songName = name;
 
                 view.setTag(holder);
             } else {
-                holder = (SongHolder)view.getTag();
+                holder = (SongHolder) view.getTag();
             }
 
             SongBean bean = songList.get(i);
@@ -218,8 +262,9 @@ public class SongSelectActivity extends AppCompatActivity implements AdapterView
     //------------------
     // GLSurfaceView
     private MyGLSurfaceView myGLSurfaceView;
+
     private void initMyGLSurfaceView() {
-        myGLSurfaceView = (MyGLSurfaceView)findViewById(R.id.my_surfaceview);
+        myGLSurfaceView = (MyGLSurfaceView) findViewById(R.id.my_surfaceview);
         myGLSurfaceView.initMyRenderer();
     }
 }

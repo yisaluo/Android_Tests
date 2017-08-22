@@ -10,7 +10,7 @@ public class InputNote {
     public double timeStamp;
     public long time;
     public float freq = 0;
-
+    public int note;
     public InputNote() {
 
     }

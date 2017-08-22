@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html ng-app="musjeDemo">
+  <head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="musje.css">
+    <link rel="stylesheet" href="main.css">
+
+    <script src="lib/angular.min.js"></script>
+    <script src="lib/snap.svg-min.js"></script>
+    <script src="lib/tv4.min.js"></script>
+    <script src="lib/MIDI.min.js"></script>  </head>
+
+  <body ng-controller="MusjeDemoCtrl">
+    <!-- ============================ content =============================-->
+    <div class="container-fluid">
+        <div resize>
+        <svg class="mus-score" id = "musScore"></svg>
+      </div>
+    </div> 
+    <script src="musje.js"></script>
+
+    
+    <script>
+
+var hided = false;
+var score;
+function showScore(musjeStr, keySigStr, scoreWidth)
+{
+    score = musje.parse(musjeStr);
+    score.clearColorOuts();
+    score.head.key = keySigStr;
+    score.render('.mus-score', {
+         fontFamily: 'Arial, Helvetica, sans-serif',
+           width: scoreWidth,
+                });
+                
+    document.location = "musScore.onDrawed";
+}
+    function clearColorsData()
+    {
+        score.clearColorOuts();
+    }
+    function showScoreWithFontSize(musjeStr, keySigStr, scoreWidth, fontSize) {
+        musje.setFontsize(fontSize);
+        score = musje.parse(musjeStr);
+        score.clearColorOuts();
+        score.head.key = keySigStr;
+        score.render('.mus-score', {
+                     fontFamily: 'Arial, Helvetica, sans-serif',
+                     width: scoreWidth,
+                     });
+        document.location = "musScore.onDrawed";
+
+    }
+    function setFontsize(fontSize) {
+        score.defaultFontsize = fontSize;
+    }
+    
+function hideAll(hide) {
+    hided = hide;
+    if (hide == true) {
+        $("#musScore").hide();
+    } else {
+        $("#musScore").show();
+    }
+}
+    
+    function lightOn(index) {
+        score.lightOn(index);
+    }
+    function lightOff(index) {
+        score.lightOff(index);
+    }
+    function scrollTo(index, height) {
+        //note at index
+        score.scrollTo(index, height);
+    }
+    function colorNote(index, colorStr) {
+        score.colorNote(index, colorStr);
+    }
+    </script>
+  </body>
+</html>

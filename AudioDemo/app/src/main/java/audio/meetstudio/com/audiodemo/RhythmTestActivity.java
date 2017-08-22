@@ -111,7 +111,7 @@ public class RhythmTestActivity extends AppCompatActivity {
                             onVolumeChanged(volume);
                         }
                     });
-                    // 大概一秒十次
+                    // 大概一秒二十次
                     synchronized (mLock) {
                         try {
                             mLock.wait(50);

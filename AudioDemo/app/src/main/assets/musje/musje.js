@@ -1,0 +1,5261 @@
+
+/**
+ * The musje namespace.
+ * @namespace
+ */
+var musje = {};
+
+var defaultFontsize = 20;
+if (typeof exports !== 'undefined') {
+  exports = musje;
+}
+
+(function (musje) {
+  'use strict';
+
+  var defineProperty = Object.defineProperty;
+
+  function isObject(obj) {
+    var type = typeof obj;
+    return type === 'function' || type === 'object' && !!obj;
+  }
+
+  /**
+   * Utility method, for each object key.
+   * @function musje.objEach
+   * @param {Object} obj - The object to be iterated.
+   * @param {musje~objEachCallback} cb - The callback for each iteration.
+   */
+  var objEach =
+  musje.objEach = function (obj, cb) {
+    if (isObject(obj)) {
+      Object.keys(obj).forEach(function (key) {
+        cb(obj[key], key);
+      });
+    }
+  };
+
+  /**
+   * A callback that will be called for each iteration in {@link musje.objEach}.
+   * @callback musje~objEachCallback
+   * @param {*} value - Value of the current property.
+   * @param {string} key - Key of the current property.
+   */
+
+  /**
+   * Utility method, extend `obj` with `ext`.
+   * @function
+   * @param {Object} obj - target object to be extended.
+   * @param {Object} ext - the extension object.
+   * @return {Object} The target object.
+   */
+  musje.extend = function(obj, ext) {
+    objEach(ext, function (val, key) { obj[key] = val; });
+    return obj;
+  };
+
+  /**
+   * Utility method, checking if `a` and `b` is close *enongh*.
+   * Useful to simulate the floating number equality check.
+   * @function
+   * @param {number} a - a number.
+   * @param {number} b - another number.
+   * @return {boolean} Wether `a` and `b` is close.
+   */
+  musje.near = function (a, b) {
+    return Math.abs(a - b) < 0.00001;
+  };
+
+
+  /**
+   * Define ES5 getter/setter properties
+   * @param {Object} obj - The object to be defined.
+   * @param {Object} props - ES5 getter/setter properties.
+   * For example:
+   * ```
+   * {
+   *   name: {
+   *     get: function () {...},
+   *     set: function () {...}
+   *   },
+   *   age: {
+   *      get:...
+   *   }
+   * }
+   * ```
+   */
+  musje.defineProperties = function (obj, props) {
+    musje.objEach(props, function (value, prop) {
+      var
+        type = typeof value,
+        descriptor;
+
+      // Accessor property.
+      if (type === 'object' && (typeof value.get === 'function' ||
+                                typeof value.set === 'function')) {
+        descriptor = value;
+
+      // Function
+      } else if (type === 'function' || prop === '$type') {
+        descriptor = { value: value };
+
+      } else {
+        descriptor = {
+          value: value,
+          writable: true,
+          enumerable: true
+        };
+      }
+
+      defineProperty(obj, prop, descriptor);
+    });
+  };
+
+  musje.toJSONWithDefault = true;
+
+  musje.makeToJSON = function (values, elName) {
+    return function () {
+      if (this.isEmpty) { return; }
+
+      var
+        that = this,
+        result = {};
+
+      musje.objEach(values, function (defaultValue, prop) {
+        if (musje.toJSONWithDefault || that[prop] !== defaultValue) {
+          result[prop] = that[prop];
+        }
+      });
+      if (!elName) { return result; }
+
+      var res = {};
+      res[elName] = result;
+      return res;
+    };
+  };
+
+  /**
+   * @memberof musje
+   * @member {Object} parser.parse
+   * @function
+   * @param {string} input
+   * @return {Object} A plain musje score object.
+   */
+
+  /**
+   * @function
+   * @param {string} input - Input of the musje source code.
+   * @return {musje.Score} - A `musje.Score` instance.
+   */
+  musje.parse = function (input) {
+    var plainScore = musje.parser.parse(input);
+    return new musje.Score(plainScore);
+  };
+ musje.setFontsize = function (inputSize) {
+    defaultFontsize = inputSize;
+ }
+
+}(musje));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  /**
+   * @class
+   * @param {Object} score - plain score object {@link musje.PlainScore}.
+   */
+  musje.Score = function (score) {
+    musje.extend(this, score);
+
+    // console.log(JSON.stringify(this, null, 2))
+    // console.log('' + this)
+  };
+
+  musje.defineProperties(musje.Score.prototype,
+  /** @lends musje.Score.prototype */
+  {
+    /**
+     * Head of the score.
+     * @type {musje.ScoreHead}
+     */
+    head: {
+      get: function () {
+        return this._head || (this._head = new musje.ScoreHead());
+      },
+      set: function (head) {
+        this._head = new musje.ScoreHead(head);
+      }
+    },
+
+    /**
+     * Partwise parts.
+     * - (Getter)
+     * - (Setter)
+     * @type {musje.PartwiseParts}
+     */
+    parts: {
+      get: function () {
+        return this._parts ||
+              (this._parts = new musje.PartwiseParts(this));
+      },
+      set: function (parts) {
+        this.parts.removeAll();
+        this.parts.addParts(parts);
+        this.measures.fromPartwise();
+      }
+    },
+
+    /**
+     * Timewise measures, generated by the initialize function.
+     * @type {musje.TimewiseMeasures}
+     * @readonly
+     */
+    measures: {
+      get: function () {
+        return this._measures ||
+              (this._measures = new musje.TimewiseMeasures(this));
+      }
+    },
+
+    /**
+     * Convert score to string.
+     * @return {string} Musje source code.
+     */
+    toString: function () {
+      return this.head + this.parts.map(function (part) {
+        return part.toString();
+      }).join('\n\n');
+    },
+
+    toJSON: musje.makeToJSON({
+      head: undefined,
+      parts: undefined
+    }),
+
+    /**
+     * A cell is identically a measure in a part or a part in a measure.
+     * @param {Function}
+     */
+    walkCells: function (callback) {
+      this.parts.forEach(function (part, p) {
+        part.measures.forEach(function (cell, m) {
+          callback(cell, m, p);
+        });
+      });
+    },
+
+    /**
+     * Walk each music data.
+     * @param {Function} callback
+     */
+    walkMusicData: function (callback) {
+      this.walkCells(function (cell, m, p) {
+        cell.data.forEach(function (data, d) {
+          callback(data, d, m, p);
+        });
+      });
+    }
+
+  });
+
+}(musje));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  /**
+   * Construct head of the score.
+   * @class
+   * @param {Object} head
+   */
+  musje.ScoreHead = function (head) {
+    musje.extend(this, head);
+  };
+
+  musje.defineProperties(musje.ScoreHead.prototype,
+  /** @lends musje.ScoreHead# */
+  {
+    /**
+     * Title of the score.
+     * @type {string}
+     */
+    title: undefined,
+                         
+    /**
+     * key Sig of the score
+     * @type {string}   //注 仅支持显示
+     */
+    key: undefined,
+                         
+    /**
+     * Subtitle of the score.
+     * @type {string}
+     */
+    subtitle: undefined,
+
+    /**
+     * Subsubtitle of the score.
+     * @type {string}
+     */
+    subsubtitle: undefined,
+
+    /**
+     * Composer of the score.
+     * @type {string}
+     */
+    composer: undefined,
+
+    /**
+     * Arranger of the score.
+     * @type {string}
+     */
+    arranger: undefined,
+
+    /**
+     * Lyricist of the score.
+     * @type {string}
+     */
+    lyricist: undefined,
+
+    isEmpty: {
+      get: function () {
+        return !this.title && !this.subtitle && !this.subsubtitle &&
+               !this.composer && !this.arranger && !this.lyricist;
+      }
+    },
+
+    /**
+     * Convert score head to string.
+     * @return {string} The converted musje head source code.
+     */
+    toString: function () {
+      return '' + (this.title ? ('<<' + this.title + '>>') : '') +
+              (this.composer || '') +
+              '\n';
+    },
+
+    toJSON: musje.makeToJSON({
+      title: undefined,
+      key: undefined,
+      subtitle: undefined,
+      subsubtitle: undefined,
+      composer: undefined,
+      lyricist: undefined
+    })
+  });
+
+}(musje));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  var properties =
+  /** @lends musje.PartwiseParts */
+  {
+
+    addParts: function (parts) {
+      var that = this;
+      parts.forEach(function (part) {
+        that.append(part);
+      });
+    },
+
+    /**
+     * Append a partwise part.
+     * @param {Object} part - Plain partwise part object.
+     */
+    append: function (part) {
+      var index = this.length;
+      var musjePart = new musje.PartwisePart(index, this);
+      this.push(musjePart);
+      musjePart.measures = part.measures;
+    },
+
+    removeAll: function () {
+      this.length = 0;
+    }
+  };
+
+
+  /**
+   * Construct partwise score parts.
+   * @class
+   * @classdesc Partwise score parts.
+   * @param score {musje.Score}
+   * @augments {Array}
+   */
+  musje.PartwiseParts = function (score) {
+
+    var parts = [];
+
+    /**
+     * Reference to the parent score.
+     * @memberof musje.PartwiseParts#
+     * @alias score
+     * @type {musje.Score}
+     */
+    parts.score = score;
+    musje.defineProperties(parts, properties);
+    return parts;
+  };
+
+}(musje));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  /**
+   * @class
+   * @param part {Object}
+   * @param index {number} - Index of this part in the parts.
+   * @param parts {musje.PartwiseParts}
+   */
+  musje.PartwisePart = function (index, parts) {
+
+    /**
+     * Index of this part in the parts.
+     * @member {number}
+     * @protected
+     */
+    this._index = index;
+
+    /**
+     * Reference to the parent parts instance.
+     * @member {musje.PartwiseParts}
+     */
+    this.parts = parts;
+  };
+
+  musje.defineProperties(musje.PartwisePart.prototype,
+  /** @lends musje.PartwisePart# */
+  {
+    // head: { $ref: '#/objects/PartHead' },
+
+    /**
+     * Measure in a partwise part is cells.
+     * @type {Array.<musje.Cell>}
+     */
+    measures: {
+      get: function () {
+        return this._measures || (this._measures = []);
+      },
+      set: function (measures) {
+        var
+          p = this._index,
+          score = this.parts.score,
+          mea = this._measures = [];
+
+        measures.forEach(function (cell, m) {
+          mea.push(new musje.Cell(cell, m, p, score));
+        });
+      }
+    },
+
+    /**
+     * Convert a partwise part to sting.
+     * @return {string} Musje partwise part source code.
+     */
+    toString: function () {
+      return this.measures.map(function (cell) {
+        return cell;
+      }).join(' ');
+    },
+
+    toJSON: musje.makeToJSON({
+      measures: undefined
+    })
+  });
+
+}(musje));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  var properties =
+  /** @lends musje.TimewiseMeasures# */
+  {
+    /**
+     * Make timewise score measures from the partwise parts.
+     */
+    fromPartwise: function () {
+      var that = this;
+
+      this.removeAll();
+
+      this.score.walkCells(function (cell, m) {
+        that[m] = that[m] || new musje.TimewiseMeasure(m, that);
+        that[m].parts.push(cell);
+      });
+    },
+
+    removeAll: function () {
+      this.length = 0;
+    }
+  };
+
+  /**
+   * Construct timewise score measures.
+   * @class
+   * @classdesc Timewise score measures.
+   * @param score {musje.Score}
+   * @augments {Array}
+   */
+  musje.TimewiseMeasures = function (score) {
+
+    var measures = [];
+
+    /**
+     * Reference to the parent score.
+     * @memberof musje.TimewiseMeasures#
+     * @alias score
+     * @type {musje.Score}
+     */
+    measures.score = score;
+    musje.defineProperties(measures, properties);
+    return measures;
+  };
+
+}(musje));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  /**
+   * @class
+   * @param measure {Object}
+   * @mixes musje.LayoutTimewiseMeasure
+   */
+  musje.TimewiseMeasure = function (index, measures) {
+
+    /**
+     * Index of this measure in the timewise score measures.
+     * @member {number}
+     * @protected
+     */
+    this._index = index;
+
+    /**
+     * Reference to the parent measures instance.
+     * @member {musje.TimewiseMeasures}
+     */
+    this.measures = measures;
+  };
+
+  musje.defineProperties(musje.TimewiseMeasure.prototype,
+  /** @lends musje.TimewiseMeasure# */
+  {
+    /**
+     * Parts in timewise measure.
+     * @type {Array.<musje.Cells>}
+     */
+    parts: {
+      get: function () {
+        return this._parts || (this._parts = []);
+      },
+      set: function (parts) {
+        this._parts = parts;
+      }
+    },
+
+    /**
+     * Left bar of the measure.
+     * @type {musje.Bar}
+     * @readonly
+     */
+    barLeft: {
+      get: function () {
+        return this.parts[0].barLeft;
+      }
+    },
+
+    /**
+     * Right bar of the measure.
+     * @type {musje.Bar}
+     * @readonly
+     */
+    barRight: {
+      get: function () {
+        return this.parts[0].barRight;
+      }
+    }
+  });
+
+}(musje));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  var near = musje.near;
+
+  function getBeamGroups(cell, groupDur) {
+    var counter = 0, group = [], groups = [];
+
+    function inGroup() {
+      return counter < groupDur && !near(counter, groupDur);
+    }
+    function putGroup() {
+      if (group.length > 1) { groups.push(group); }
+      group = [];
+    }
+
+    cell.data.forEach(function (musicData) {
+      if (musicData.$type !== 'Note' && musicData.$type !== 'Rest') {
+        return;
+      }
+      var
+        duration = musicData.duration,
+        dur = duration.quarter;
+
+      counter += dur;
+
+      if (inGroup()) {
+        if (duration.underbar) { group.push(musicData); }
+      } else if (near(counter, groupDur)) {
+        group.push(musicData);
+        putGroup();
+        counter = 0;
+      } else {
+        putGroup();
+        counter %= groupDur;
+      }
+    });
+
+    putGroup();
+
+    return groups;
+  }
+
+  /**
+   * Construct a cell.
+   * Cell is either a measure in a partwise part, or
+   * a part in a timewise measure.
+   * @class
+   * @param cell {Object}
+   * @param mIndex {number} - Measure index of this cell.
+   * @param pIndex {number} - Part index of this cell.
+   * @mixes musje.LayoutCell
+   */
+  musje.Cell = function (cell, mIndex, pIndex, score) {
+
+    /**
+     * Measure index of this cell.
+     * @member {number}
+     * @protected
+     */
+    this._mIndex = mIndex;
+
+    /**
+     * Part index of this cell.
+     * @member {number}
+     * @protected
+     */
+    this._pIndex = pIndex;
+
+    /**
+     * Reference to the root score instance.
+     * @member {musje.Score}
+     * @readonly
+     */
+    this.score = score;
+
+    musje.extend(this, cell);
+
+    this.makeBeams(1);
+  };
+
+  musje.defineProperties(musje.Cell.prototype,
+  /** @lends musje.Cell# */
+  {
+    /**
+     * Music data
+     * @type {Array.<musje.MusicData>}
+     */
+    data: {
+      get: function () {
+        return this._data || (this._data = []);
+      },
+      set: function (data) {
+        var that = this;
+        that.length = 0;
+        data.forEach(function (datum) {
+          that.append(datum);
+        });
+      }
+    },
+
+    /**
+     * Reference to the parent measures.
+     * @type {musje.TimewiseMeasures}
+     * @readonly
+     */
+    measures: {
+      get: function () {
+        return this.score.measures;
+      }
+    },
+
+    /**
+     * Reference to the parent measure.
+     * @type {musje.TimewiseMeasure}
+     * @readonly
+     */
+    measure: {
+      get: function () {
+        return this.measures[this._mIndex];
+      }
+    },
+
+    /**
+     * Reference to the parent parts.
+     * @type {musje.PartwiseParts}
+     * @readonly
+     */
+    parts: {
+      get: function () {
+        return this.score.parts;
+      }
+    },
+
+    /**
+     * Reference to the parent part.
+     * @type {musje.PartwisePart}
+     * @readonly
+     */
+    part: {
+      get: function () {
+        return this.parts[this._pIndex];
+      }
+    },
+
+    /**
+     * Previous cell in the part.
+     * @type {musje.Cell|undefined}
+     * @readonly
+     */
+    prev: {
+      get: function () {
+        return this.part.measures[this._mIndex - 1];
+      }
+    },
+
+    /**
+     * Next cell in the part.
+     * @type {musje.Cell|undefined}
+     * @readonly
+     */
+    next: {
+      get: function () {
+        return this.part.measures[this._mIndex + 1];
+      }
+    },
+
+    /**
+     * The first music data in the cell.
+     * @type {musje.MusicData|undefined}
+     * @readonly
+     */
+    firstData: {
+      get: function () {
+        return this.data[0];
+      }
+    },
+
+    /**
+     * The last music data in the cell.
+     * @type {musje.MusicData|undefined}
+     * @readonly
+     */
+    lastData: {
+      get: function () {
+        return this.data[this.data.length - 1];
+      }
+    },
+
+    /**
+     * The left bar of this cell.
+     * @type {musje.Bar|undefined}
+     * @readonly
+     */
+    barLeft: {
+      get: function () {
+        var firstData = this.firstData;
+
+        if (firstData && firstData.$type === 'Bar') {
+          return firstData;
+        }
+
+        // Take from the previous measure.
+        var prevCell = this.prev;
+        if (prevCell) {
+          return prevCell.barRight;
+        }
+      }
+    },
+
+    /**
+     * The right bar of this cell.
+     * @type {musje.Bar|undefined}
+     * @readonly
+     */
+    barRight: {
+      get: function () {
+        var lastData = this.lastData;
+
+        if (lastData && lastData.$type === 'Bar') {
+          return lastData;
+        }
+      }
+    },
+
+    /**
+     * Append a music data to the cell.
+     * @param  {Object} musicData - Music data
+     */
+    append: function (musicData) {
+      var
+        name = Object.keys(musicData)[0],
+        className = name[0].toUpperCase() + name.substr(1),
+        instance = new musje[className](musicData[name]);
+
+      /**
+       * Reference to the parent cell
+       * @memberof musje.MusicData#
+       * @alias cell
+       * @type {musje.Cell}
+       * @readonly
+       */
+      instance.cell = this;
+
+      /**
+       * Index of the music data in the cell
+       * @memberof musje.MusicData#
+       * @alias _index
+       * @type {number}
+       * @protected
+       */
+      instance._index = this.data.length;
+
+      this.data.push(instance);
+    },
+
+    /**
+     * Convert cell to string.
+     * @return {string} Converted cell in musje source code.
+     */
+    toString: function () {
+      return this.data.map(function (musicData) {
+        return musicData.toString();
+      }).join(' ');
+    },
+
+    toJSON: musje.makeToJSON({
+      data: undefined
+    }),
+
+    /**
+     * Make beams automatically in group by the groupDur.
+     * @param {number} groupDur - Duration of a beam group in quarter.
+     */
+    makeBeams: function (groupDur) {
+
+      getBeamGroups(this, groupDur).forEach(function (group) {
+
+        // beamLevel starts from 0 while underbar starts from 1
+        var beamLevel = {};
+
+        function nextHasSameBeamlevel(index, level) {
+          var next = group[index + 1];
+          return next && next.duration.underbar > level;
+        }
+
+        group.forEach(function(data, i) {
+          var
+            underbar = data.duration.underbar,
+            level;
+
+          for (level = 0; level < underbar; level++) {
+            if (nextHasSameBeamlevel(i, level)) {
+
+              /**
+               * Beams of the note.
+               * - Produced by the {@link musje.Cell#makeBeams} method.
+               * - The above method is call in {@link musje.Score#prepareCells}.
+               * @memberof musje.Note#
+               * @alias beams
+               * @type {Array.<musje.Beam>}
+               */
+              data.beams = data.beams || [];
+
+              if (beamLevel[level]) {
+                data.beams[level] = new musje.Beam('continue', level, data);
+              } else {
+                beamLevel[level] = true;
+                data.beams[level] = new musje.Beam('begin', level, data);
+              }
+            } else {
+              if (beamLevel[level]) {
+                data.beams = data.beams || [];
+                data.beams[level] = new musje.Beam('end', level, data);
+                delete beamLevel[level];
+              }
+            }
+          }
+        });
+      });
+    }
+
+  });
+
+}(musje));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  var BAR_TO_STRING = {
+      single: '|', double: '||', end: '|]',
+      'repeat-begin': '|:', 'repeat-end': ':|', 'repeat-both': ':|:'
+    };
+
+  /**
+   * @class
+   * @param {string} bar - The bar value, which can be either of
+   * - 'single' - `|`
+   * - 'double' - `||`
+   * - 'end' - `|]`
+   * - 'repeat-begin' - `|:`
+   * - 'repeat-end' - `:|`
+   * - 'repeat-both' - `:|:`
+   * @mixes musje.MusicData
+   * @mixes musje.LayoutMusicData
+   */
+  musje.Bar = function (bar) {
+    this.value = bar;
+  };
+
+  musje.defineProperties(musje.Bar.prototype,
+  /** @lends musje.Bar.prototype */
+  {
+    /**
+     * Type of bar.
+     * @type {string}
+     * @constant
+     * @default
+     */
+    $type: 'Bar',
+
+    /**
+     * Value of the bar, which is the same as the bar parameter in the constructor.
+     * @member {string} - The bar value
+     * @alias musje.Bar.prototype.value
+     * @default
+     */
+    value: 'single',
+
+    /**
+     * Convert bar to string.
+     * @return {string} Converted string of the barline in musje source code.
+     */
+    toString: function () {
+      return BAR_TO_STRING[this.value];
+    },
+
+    toJSON: function () {
+      return { bar: this.value };
+    }
+  });
+
+}(musje));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  /**
+   * Time signature.
+   * @class
+   * @param time {Object}
+   * @mixes musje.MusicData
+   * @mixes musje.LayoutMusicData
+   */
+  musje.Time = function (time) {
+    musje.extend(this, time);
+  };
+
+  musje.defineProperties(musje.Time.prototype,
+  /** @lends musje.Time# */
+  {
+    /**
+     * Type of time.
+     * @type {string}
+     * @constant
+     * @default
+     */
+    $type: 'Time',
+
+    /**
+     * How many beats per measure.
+     * @type {number}
+     * @default
+     */
+    beats: 4,
+
+    /**
+     * Beat type
+     * @type {number}
+     * @default
+     */
+    beatType: 4,
+
+    /**
+     * Convert to musje source code.
+     * @return {string} Musje source code.
+     */
+    toString: function () {
+      return this.beats + '/' + this.beatType;
+    },
+
+    toJSON: musje.makeToJSON({
+      beats: 4,
+      beatType: 4
+    }, 'time')
+  });
+
+}(musje));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  /**
+   * @class
+   * @param {Object} note
+   * @mixes musje.MusicData
+   * @mixes musje.LayoutMusicData
+   */
+  musje.Note = function (note) {
+    musje.extend(this, note);
+
+    /**
+     * Reference to the parent parent.
+     * @memberof musje.Pitch#
+     * @alias parent
+     * @type {musje.MusicData}
+     * @readonly
+     */
+    this.pitch.parent = this;
+  };
+
+  musje.defineProperties(musje.Note.prototype,
+  /** @lends musje.Note.prototype */
+  {
+    /**
+     * Type of note.
+     * @type {string}
+     * @constant
+     * @default
+     */
+    $type: 'Note',
+
+    /**
+     * Pitch of the note.
+     * @type {musje.Pitch}
+     */
+    pitch: {
+      get: function () {
+        return this._pitch || (this._pitch = new musje.Pitch());
+      },
+      set: function (pitch) {
+        this._pitch = new musje.Pitch(pitch);
+      }
+    },
+
+    /**
+     * Duration of the note.
+     * @type {musje.Duration}
+     */
+    duration: {
+      get: function () {
+        return this._duration || (this._duration = new musje.Duration());
+      },
+      set: function (duration) {
+        this._duration = new musje.Duration(duration);
+      }
+    },
+
+    beams: {
+      get: function () {
+        return this._beams || (this._beams = []);
+      },
+      set: function (beams) {
+        this._beams = beams;
+      }
+    },
+
+    /**
+     * Tie
+     * @type {musje.Tie}
+     */
+    tie: {
+      get: function () {
+        return this._tie || (this._tie = new musje.Tie(this));
+      },
+      set: function (tie) {
+
+        /**
+         * Value of the tie.
+         * @memberof musje.Tie#
+         * @alias value
+         * @type {boolean}
+         */
+        this.tie.value = tie;
+      }
+    },
+
+    /**
+     * Slur
+     * @type {musje.Slur}
+     */
+    slur: {
+      get: function () {
+        return this._slur || (this._slur = new musje.Slur(this));
+      },
+      set: function (slur) {
+        musje.extend(this.slur, slur);
+      }
+    },
+
+    /** @method */
+    toString: function () {
+      return this.slur.begin + this.pitch + this.duration +
+             this.slur.end + this.tie.value;
+    },
+
+    toJSON: musje.makeToJSON({
+      pitch: undefined,
+      duration: undefined,
+      tie: undefined,
+      slur: undefined
+    }, 'note')
+  });
+
+}(musje));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  /**
+   * @class
+   * @param {rest} rest
+   * @mixes musje.MusicData
+   * @mixes musje.LayoutMusicData
+   */
+  musje.Rest = function (rest) {
+    musje.extend(this, rest);
+  };
+
+  musje.defineProperties(musje.Rest.prototype,
+  /** @lends musje.Rest# */
+  {
+    /**
+     * Type of rest.
+     * @type {string}
+     * @constant
+     * @default
+     */
+    $type: 'Rest',
+
+    /**
+     * Duration of the rest.
+     * @type {musje.Duration}
+     */
+    duration: {
+      get: function () {
+        return this._duration || (this._duration = new musje.Duration());
+      },
+      set: function (duration) {
+        this._duration = new musje.Duration(duration);
+      }
+    },
+
+    beams: {
+      get: function () {
+        return this._beams || (this._beams = []);
+      },
+      set: function (beams) {
+        this._beams = beams;
+      }
+    },
+
+    /**
+     * Convert the rest to musje source code string.
+     * @return {string} Converted musje source code.
+     */
+    toString: function () {
+      return '0' + this.duration;
+    },
+
+    toJSON: musje.makeToJSON({
+      duration: undefined,
+    }, 'rest')
+  });
+
+}(musje));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  /**
+   * @class
+   * @param {Object} chord
+   * @mixes musje.MusicData
+   * @mixes musje.LayoutMusicData
+   */
+  musje.Chord = function (chord) {
+    musje.extend(this, chord);
+  };
+
+  musje.defineProperties(musje.Chord.prototype,
+  /** @lends musje.Chord# */
+  {
+    /**
+     * Type of chord.
+     * @type {string}
+     * @constant
+     * @default
+     */
+    $type: 'Chord',
+
+    /**
+     * Pitches in the chord.
+     * @type {Array.<musje.Pitch>}
+     */
+    pitches: {
+      get: function () {
+        return this._pitches || (this._pitches = []);
+      },
+      set: function (pitches) {
+        this._pitches = pitches.map(function (pitch) {
+          return new musje.Pitch(pitch);
+        });
+      }
+    },
+
+    /**
+     * Duration of the chord.
+     * @type {musje.Duration}
+     */
+    duration: {
+      get: function () {
+        return this._duration || (this._duration = new musje.Duration());
+      },
+      set: function (duration) {
+        this._duration = new musje.Duration(duration);
+      }
+    },
+
+    /**
+     * Convert chord to the musje source code string.
+     * @return {string} Converted musje source code of the chord.
+     */
+    toString: function () {
+      return '<' + this.pitches.map(function (pitch) {
+        return pitch.toString();
+      }).join('') + '>' + this.duration;
+    },
+
+    toJSON: musje.makeToJSON({
+      pitches: undefined,
+      duration: undefined,
+    }, 'chord')
+  });
+
+}(musje));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  /**
+   * @class
+   * @param {Object} voice
+   */
+  musje.Voice = function (voice) {
+    musje.extend(this, voice);
+  };
+
+  musje.defineProperties(musje.Voice.prototype,
+  /** @lends musje.Voice# */
+  {
+    /**
+     * Convert the voice to musje source code string.
+     * @return {string} Converted musje source code string.
+     */
+    toString: function () {
+
+    }
+  });
+
+}(musje));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  // Constants and helpers
+  // =================================================================
+
+  var
+    A4_FREQUENCY = 440,
+    A4_MIDI_NUMBER = 69,
+    STEP_TO_MIDI_NUMBER = [null, 0, 2, 4, 5, 7, 9, 11],
+    ACCIDENTAL_TO_ALTER = { '#' : 1, '##': 2, n: 0, b : -1, bb: -2 };
+
+  function chars(ch, num) {
+    return new Array(num + 1).join(ch);
+  }
+
+  function octaveString(octave) {
+    return octave > 0 ? chars('\'', octave) :
+           octave < 0 ? chars(',', -octave) : '';
+  }
+
+  /**
+   * @class
+   * @param pitch {Object}
+   */
+  musje.Pitch = function (pitch) {
+    musje.extend(this, pitch);
+  };
+
+  musje.defineProperties(musje.Pitch.prototype,
+  /** @lends musje.Pitch.prototype */
+  {
+    /**
+     * Step is a value of `1`, `2`, `3`, `4`, `5`, `6`, or `7`.
+     * @type {number}
+     * @default
+     */
+    step: 1,
+
+    /**
+     * Octave is an integer value from `-5` to `5` inclusive.
+     * @type {number}
+     * @default
+     */
+    octave: 0,
+
+    /**
+     * Accidental is either of
+     * - `'#'` - sharp
+     * - `'##'` - double sharp
+     * - `'b'` - flat
+     * - `'bb'` - double flat
+     * - `'n'` - natural
+     * - `''` - (none)
+     * @type {string}
+     */
+    accidental: '',
+
+    /**
+     * Alter (from -2 to 2 inclusive).
+     *
+     * If no accidental in this pitch, it might be affected by a previous note in the same cell (the same part and the same measure).
+     * @type {number}
+     * @readonly
+     */
+    alter: {
+      get: function () {
+        if (this.accidental) {
+          return ACCIDENTAL_TO_ALTER[this.accidental];
+        }
+        var al = this.alterLink;
+        return al ? al.alter : 0;
+      }
+    },
+
+    /**
+     * Pitch linked that will affect the alter in this pitch.
+     * @type {musje.Pitch|undefined}
+     * @readonly
+     */
+    alterLink: {
+      get: function () {
+        var prevData = this.parent.prev;
+
+        while(prevData) {
+          if (prevData.$type === 'Note' &&
+              prevData.pitch.step === this.step && prevData.pitch.accidental) {
+            return prevData.pitch;
+          }
+          prevData = prevData.prev;
+        }
+      }
+    },
+
+    /**
+     * The MIDI note number of the pitch
+     * @type {number}
+     */
+    midiNumber: {
+      get: function () {
+        return (this.octave + 5) * 12 +
+          STEP_TO_MIDI_NUMBER[this.step] + this.alter;
+      }
+    },
+
+    /**
+     * Frequency of the pitch
+     * @type {number}
+     * @readonly
+     */
+    frequency: {
+      get: function () {
+        return A4_FREQUENCY * Math.pow(2, (this.midiNumber - A4_MIDI_NUMBER) / 12);
+      }
+    },
+
+    /**
+     * Convert to musje source code string.
+     * @return {string} Converted musje source code string.
+     */
+    toString: function () {
+      return this.accidental + this.step + octaveString(this.octave);
+    },
+
+    toJSON: musje.makeToJSON({
+      step: 1,
+      octave: 0,
+      accidental: ''
+    })
+  });
+
+}(musje));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  var
+    TYPE_TO_STRING = {
+      1: ' - - - ', 2: ' - ', 4: '', 8: '_', 16: '=', 32: '=_',
+      64: '==', 128: '==_', 256: '===', 512: '===_', 1024: '===='
+    },
+    // Convert from duration type to number of underbars.
+    TYPE_TO_UNDERBAR = {
+      1: 0, 2: 0, 4: 0, 8: 1, 16: 2, 32: 3,
+      64: 4, 128: 5, 256: 6, 512: 7, 1024: 8
+    },
+    DOT_TO_STRING = { 0: '', 1: '.', 2: '..' };
+
+  /**
+   * @class
+   * @param duration {Object}
+   */
+  musje.Duration = function (duration) {
+    musje.extend(this, duration);
+  };
+
+  musje.defineProperties(musje.Duration.prototype,
+  /** @lends musje.Duration# */
+  {
+    /**
+     * Type of duration.
+     * @type {string}
+     * @constant
+     * @default
+     */
+    $type: 'Duration',
+
+    /**
+     * Beat type
+     * @type {number}
+     * @default
+     */
+    type: 4,
+
+    /**
+     * Dot with value of 0, 1, or 2.
+     * @type {number}
+     * @default
+     */
+    dot: 0,
+
+    /**
+     * `(Getter)` Duration measured in quarter note.
+     * @type {number}
+     */
+    quarter: {
+      get: function () {
+        var d = 4 / this.type;
+        return this.dot === 0 ? d :
+               this.dot === 1 ? d * 1.5 : d * 1.75;
+      }
+    },
+
+    /**
+     * `(Getter)` Duration in second
+     * Affected by the tempo.
+     * @type {number}
+     * @readonly
+     */
+    second: {
+      get: function () {
+        return this.quarter * 60 / 80; // / TEMPO;
+      }
+    },
+
+    /**
+     * `(Getter)` Underbar
+     * @type {number}
+     * @readonly
+     */
+    underbar: {
+      get: function () {
+        return TYPE_TO_UNDERBAR[this.type] || 0;
+      }
+    },
+
+    /**
+     * @return {string}
+     */
+    toString: function () {
+      return TYPE_TO_STRING[this.type] + DOT_TO_STRING[this.dot];
+    },
+
+    toJSON: musje.makeToJSON({
+      type: 4,
+      dot: 0
+    })
+  });
+
+}(musje));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  /**
+   * A [beam][wiki] is a horizontal or diagonal line used to connect multiple consecutive notes (and occasionally rests) in order to indicate rhythmic grouping. Only eighth notes (quavers) or shorter can be beamed.
+   *
+   * [wiki]: https://en.wikipedia.org/wiki/Beam_(music)
+   *
+   * Beam is created by {@link musje.Cell#makeBeams} and
+   * attached to {@link musje.Durable} in {@link musje.Durable#beams}[level]
+   * @class
+   * @param {string} value - Beam value: `'begin'`, `'continue'` or `'end'`.
+   * @param {number} level - Beam level starting from 0 to up.
+   * @param {musje.Durable} parent - The parent durable music data.
+   */
+  musje.Beam = function (value, level, parent) {
+
+    /** @member */
+    this.value = value;
+
+    /** @member */
+    this.level = level;
+
+    /** @member */
+    this.parent = parent;
+  };
+
+  musje.defineProperties(musje.Beam.prototype,
+  /** @lends musje.Beam# */
+  {
+
+  /**
+   * The end parent music data of the beam group.
+   * @type {musje.MusicData}
+   */
+  endDurable: {
+      get: function () {
+        var nextData = this.parent.next;
+
+        while (nextData && nextData.beams[this.level].value !== 'end') {
+          nextData = nextData.next;
+        }
+        return nextData;
+      }
+    }
+  });
+
+}(musje));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  /**
+   * Slur
+   * @class
+   * @param parent {musje.Note|musje.Chord}
+   */
+  musje.Slur = function (parent) {
+
+    /**
+     * Parent
+     * @type {musje.Note|musje.Chord}
+     * @readonly
+     */
+    this.parent = parent;
+  };
+
+  musje.defineProperties(musje.Slur.prototype,
+  /** @lends musje.Slur# */
+  {
+    begin: '',
+
+    end: '',
+
+    /**
+     * Previous slurred parent.
+     * @type {musje.Note|musje.Chord}
+     * @readonly
+     */
+    prevParent: {
+      get: function () {
+        if (!this.end) { return; }
+
+        var prev = this.parent.prevInPart;
+        while(prev) {
+          if (prev.slur && !prev.slur.isEmpty) {
+            return prev;
+          }
+          prev = prev.prevInPart;
+        }
+      }
+    },
+
+    /**
+     * Next Slurred parent.
+     * @type {musje.Note|musje.Chord}
+     * @readonly
+     */
+    nextParent: {
+      get: function () {
+        if (!this.begin) { return; }
+
+        var next = this.parent.nextInPart;
+        while(next) {
+          if (next.slur && !next.slur.isEmpty) {
+            return next;
+          }
+          next = next.nextInPart;
+        }
+      }
+    },
+
+    /**
+     * @todo
+     * @type {boolean}
+     * @readonly
+     */
+    prevCrossTie: {
+      get: function () {
+
+      }
+    },
+
+    /**
+     * @todo
+     * @type {boolean}
+     * @readonly
+     */
+    nextCrossTie: {
+      get: function () {
+
+      }
+    },
+
+    /**
+     * If the previous slur has error.
+     * @type {boolean}
+     * @readonly
+     */
+    prevHasError: {
+      get: function () {
+        var prev = this.prevParent;
+        return !prev || !prev.slur.begin;
+      }
+    },
+
+    /**
+     * If the next slur has error.
+     * @type {boolean}
+     * @readonly
+     */
+    nextHasError: {
+      get: function () {
+        var next = this.nextParent;
+        return !next || !next.slur.end;
+      }
+    },
+
+    /**
+     * If the slur is empty.
+     * @type {boolean}
+     * @readonly
+     */
+    isEmpty: {
+      get: function () {
+        return !(this.begin || this.end);
+      }
+    },
+
+    /**
+     * Convert the slur to JSON object.
+     * @method
+     * @return {Object} JSON object.
+     */
+    toJSON: musje.makeToJSON({
+      begin: undefined,
+      end: undefined
+    })
+  });
+
+}(musje));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  /**
+   * Tie of the note.
+   * @class
+   * @param parent {musje.Note|musje.Chord}
+   */
+  musje.Tie = function (parent) {
+
+    /**
+     * Parent
+     * @type {musje.Note|musje.Chord}
+     * @readonly
+     */
+    this.parent = parent;
+  };
+
+  musje.defineProperties(musje.Tie.prototype,
+  /** @lends musje.Tie# */
+  {
+    value: '',
+
+    /**
+     * @readonly
+     */
+    begin: {
+      get: function () {
+        return this.value;
+      }
+    },
+
+    /**
+     * @readonly
+     */
+    end: {
+      get: function () {
+        return this.prevParent;
+      }
+    },
+
+    /**
+     * The previous durable music data in part, if it is a tie begin.
+     * @type {musje.Durable|undefined}
+     * @readonly
+     */
+    prevParent: {
+      get: function () {
+        var prev = this.parent.prevDurableInPart;
+        return prev && prev.tie && prev.tie.value && prev;
+      }
+    },
+
+    /**
+     * The next durable music data in part.
+     * @type {musje.Durable|undefined}
+     * @readonly
+     */
+    nextParent: {
+      get: function () {
+        return this.value && this.parent.nextDurableInPart;
+      }
+    },
+
+    /**
+     * If previous durable music data in part has error.
+     * @type {boolean}
+     * @readonly
+     */
+    prevHasError: {
+      get: function () {
+        var prev = this.prevParent;
+        if (!prev || !prev.pitch) { return true; }
+        return prev.pitch && prev.pitch.midiNumber !== this.parent.pitch.midiNumber;
+      }
+    },
+
+    /**
+     * If next durable music data in part has error.
+     * @type {boolean}
+     * @readonly
+     */
+    nextHasError: {
+      get: function () {
+        var next = this.nextParent;
+        if (!next || !next.pitch) { return true; }
+        return next.pitch.midiNumber !== this.parent.pitch.midiNumber;
+      }
+    },
+
+    toJSON: function () {
+      return this.value;
+    }
+  });
+
+}(musje));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  /**
+   * Music data mixin
+   * @mixin
+   */
+  musje.MusicData =
+  /** @lends musje.MusicData# */
+  {
+
+    /**
+     * The ascendant system of the music data.
+     * @type {musje.Layout.System}
+     * @readonly
+     */
+    system: {
+      get: function () {
+        return this.cell.measure.system;
+      }
+    },
+
+    /**
+     * Previous music data.
+     * @type {musje.MusicData|undefined}
+     * @readonly
+     */
+    prev: {
+      get: function () {
+        return this.cell.data[this._index - 1];
+      }
+    },
+
+    /**
+     * Next music data.
+     * @type {musje.MusicData|undefined}
+     * @readonly
+     */
+    next: {
+      get: function () {
+        return this.cell.data[this._index + 1];
+      }
+    },
+
+    /**
+     * Previous music data in part, across measure.
+     * @type {musje.MusicData|undefined}
+     * @readonly
+     */
+    prevInPart: {
+      get: function () {
+        var prev = this.prev, cell = this.cell;
+        while (!prev && cell.prev) {
+          if (!prev) {
+            cell = cell.prev;
+            prev = cell.lastData;
+          }
+        }
+        return prev;
+      }
+    },
+
+    /**
+     * Next music data in part, across measure.
+     * @type {musje.MusicData|undefined}
+     * @readonly
+     */
+    nextInPart: {
+      get: function () {
+        var next = this.next, cell = this.cell;
+        while (!next && cell.next) {
+          if (!next) {
+            cell = cell.next;
+            next = cell.firstData;
+          }
+        }
+        return next;
+      }
+    },
+
+    /**
+     * Previous music data which has a duration.
+     * @type {musje.MusicData|undefined}
+     * @readonly
+     */
+    prevDurable: {
+      get: function () {
+        var prev = this.prev;
+        while (prev && !prev.duration) {
+          prev = prev.prev;
+        }
+        return prev;
+      }
+    },
+
+    /**
+     * Next music data which has a duration.
+     * @type {musje.MusicData|undefined}
+     * @readonly
+     */
+    nextDurable: {
+      get: function () {
+        var next = this.next;
+        while (next && !next.duration) {
+          next = next.next;
+        }
+        return next;
+      }
+    },
+
+    /**
+     * Previous music data which has a duration in part, across measure.
+     * @type {musje.MusicData|undefined}
+     * @readonly
+     */
+    prevDurableInPart: {
+      get: function () {
+        var prev = this.prevInPart;
+        while (prev && !prev.duration) {
+          prev = prev.prevInPart;
+        }
+        return prev;
+      }
+    },
+
+    /**
+     * Next music data which has a duration in part, across measure.
+     * @type {musje.MusicData|undefined}
+     * @readonly
+     */
+    nextDurableInPart: {
+      get: function () {
+        var next = this.nextInPart;
+        while (next && !next.duration) {
+          next = next.nextInPart;
+        }
+        return next;
+      }
+    }
+
+  };
+
+  [
+    'Time', 'Bar', 'Note', 'Rest', 'Chord', 'Voice'
+  ].forEach(function (className) {
+    musje.defineProperties(musje[className].prototype, musje.MusicData);
+  });
+
+}(musje));
+
+(function (musje) {
+
+/* parser generated by jison 0.4.15 */
+/*
+  Returns a Parser object of the following structure:
+
+  Parser: {
+    yy: {}
+  }
+
+  Parser.prototype: {
+    yy: {},
+    trace: function(),
+    symbols_: {associative list: name ==> number},
+    terminals_: {associative list: number ==> name},
+    productions_: [...],
+    performAction: function anonymous(yytext, yyleng, yylineno, yy, yystate, $$, _$),
+    table: [...],
+    defaultActions: {...},
+    parseError: function(str, hash),
+    parse: function(input),
+
+    lexer: {
+        EOF: 1,
+        parseError: function(str, hash),
+        setInput: function(input),
+        input: function(),
+        unput: function(str),
+        more: function(),
+        less: function(n),
+        pastInput: function(),
+        upcomingInput: function(),
+        showPosition: function(),
+        test_match: function(regex_match_array, rule_index),
+        next: function(),
+        lex: function(),
+        begin: function(condition),
+        popState: function(),
+        _currentRules: function(),
+        topState: function(),
+        pushState: function(condition),
+
+        options: {
+            ranges: boolean           (optional: true ==> token location info will include a .range[] member)
+            flex: boolean             (optional: true ==> flex-like lexing behaviour where the rules are tested exhaustively to find the longest match)
+            backtrack_lexer: boolean  (optional: true ==> lexer regexes are tested in order and for each matching regex the action code is invoked; the lexer terminates the scan when a token is returned by the action code)
+        },
+
+        performAction: function(yy, yy_, $avoiding_name_collisions, YY_START),
+        rules: [...],
+        conditions: {associative list: name ==> set},
+    }
+  }
+
+
+  token location info (@$, _$, etc.): {
+    first_line: n,
+    last_line: n,
+    first_column: n,
+    last_column: n,
+    range: [start_number, end_number]       (where the numbers are indexes into the input string, regular zero-based)
+  }
+
+
+  the parseError function receives a 'hash' object with these members for lexer and parser errors: {
+    text:        (matched text)
+    token:       (the produced terminal token, if any)
+    line:        (yylineno)
+  }
+  while parser (grammar) errors will also provide these members, i.e. parser errors deliver a superset of attributes: {
+    loc:         (yylloc)
+    expected:    (string describing the set of expected tokens)
+    recoverable: (boolean: TRUE when the parser has a error recovery rule available for this particular error)
+  }
+*/
+var parser = (function(){
+var o=function(k,v,o,l){for(o=o||{},l=k.length;l--;o[k[l]]=v);return o},$V0=[1,11],$V1=[1,15],$V2=[1,16],$V3=[1,17],$V4=[1,18],$V5=[1,19],$V6=[1,20],$V7=[1,23],$V8=[1,27],$V9=[1,34],$Va=[1,35],$Vb=[1,33],$Vc=[1,28],$Vd=[1,29],$Ve=[5,9,10,14,21,22,23,24,25,26,29,34,39,41,48,51,58],$Vf=[2,8],$Vg=[5,9,10,21,22,23,24,25,26,29,34,39,41,48,51,58],$Vh=[5,21,22,23,24,25,26],$Vi=[2,47],$Vj=[1,48],$Vk=[1,49],$Vl=[1,50],$Vm=[1,51],$Vn=[1,52],$Vo=[5,9,10,21,22,23,24,25,26,28,29,34,35,39,41,48,51,53,58],$Vp=[5,9,10,21,22,23,24,25,26,28,29,34,35,39,41,43,44,45,46,47,48,51,53,58],$Vq=[5,9,10,21,22,23,24,25,26,28,29,34,35,39,41,43,44,45,46,47,48,50,51,53,58],$Vr=[1,63],$Vs=[1,64],$Vt=[5,21,22,23,24,25,26,29,34,39,41,48,51,58],$Vu=[5,9,10,21,22,23,24,25,26,28,29,34,35,39,41,43,48,51,53,58],$Vv=[5,9,10,21,22,23,24,25,26,28,29,34,39,41,48,51,53,58],$Vw=[39,41,50];
+var parser = {trace: function trace() { },
+yy: {},
+symbols_: {"0":29,"error":2,"e":3,"maybe_musje":4,"EOF":5,"space":6,"maybe_space":7,"musje":8,"S":9,"NL":10,"score_head":11,"part_list":12,"title":13,"TITLE":14,"COMPOSER":15,"part":16,"measure_list":17,"bar":18,"measure":19,"music_data":20,"|":21,"||":22,"|]":23,"|:":24,":|":25,":|:":26,"slurable":27,"TIE":28,"maybe_duration":30,"voice":31,"time_signature":32,"pitchful":33,"(":34,")":35,"note":36,"chord":37,"pitch":38,"STEP":39,"OCTAVE":40,"ACCIDENTAL":41,"type_modifier":42,"DOT":43,"_":44,"=":45,"HALF":46,"WHOLE":47,"<":48,"pitch_list":49,">":50,"{":51,"voice_list":52,"}":53,"voice_data_list":54,":":55,"voice_data":56,"restslurable_list":57,"BEATS":58,"BEAT_TYPE":59,"$accept":0,"$end":1},
+terminals_: {2:"error",5:"EOF",9:"S",10:"NL",14:"TITLE",15:"COMPOSER",21:"|",22:"||",23:"|]",24:"|:",25:":|",26:":|:",28:"TIE",29:"0",34:"(",35:")",39:"STEP",40:"OCTAVE",41:"ACCIDENTAL",43:"DOT",44:"_",45:"=",46:"HALF",47:"WHOLE",48:"<",50:">",51:"{",53:"}",54:"voice_data_list",55:":",57:"restslurable_list",58:"BEATS",59:"BEAT_TYPE"},
+productions_: [0,[3,2],[4,0],[4,2],[4,3],[4,1],[6,1],[6,1],[7,0],[7,2],[7,2],[8,1],[8,1],[8,2],[11,2],[13,1],[13,2],[12,1],[16,1],[16,3],[17,1],[17,4],[17,3],[19,2],[19,3],[18,1],[18,1],[18,1],[18,1],[18,1],[18,1],[20,1],[20,2],[20,2],[20,1],[20,1],[27,2],[27,3],[27,3],[27,4],[33,1],[33,1],[36,1],[38,1],[38,2],[38,2],[38,3],[30,0],[30,1],[30,1],[30,2],[42,1],[42,1],[42,2],[42,2],[42,3],[42,3],[42,1],[42,1],[37,3],[49,1],[49,2],[31,3],[52,1],[52,3],[56,1],[56,2],[32,2]],
+performAction: function anonymous(yytext, yyleng, yylineno, yy, yystate /* action[1] */, $$ /* vstack */, _$ /* lstack */) {
+/* this == yyval */
+
+var $0 = $$.length - 1;
+switch (yystate) {
+case 1:
+ return $$[$0-1]; 
+break;
+case 2: case 3:
+ this.$ = null; 
+break;
+case 4: case 5:
+ this.$ = $$[$0]; removeLastEmptyMeasure($$[$0]); 
+break;
+case 10:
+ this.$ = $$[$0-1] ? $$[$0-1] + 1 : 1; 
+break;
+case 11:
+this.$ = { head: $$[$0] };
+break;
+case 12:
+this.$ = { parts: $$[$0] };
+break;
+case 13:
+this.$ = { head: $$[$0-1], parts: $$[$0] };
+break;
+case 15:
+ this.$ = { title: $$[$0] }; 
+break;
+case 16:
+ this.$ =  { title: $$[$0-1], composer: $$[$0] }; 
+break;
+case 17: case 60: case 63:
+this.$ = [$$[$0]];
+break;
+case 18:
+this.$ = { measures: $$[$0] };
+break;
+case 19:
+ this.$ = { measures: $$[$0]}; $$[$0][0].data.unshift({ bar: $$[$0-2] }); 
+break;
+case 20:
+ this.$ = [$$[$0]]; 
+break;
+case 21:
+ this.$ = $$[$0-3]; lastItem($$[$0-3]).data.push({ bar: $$[$0-2] }); $$[$0-3].push($$[$0]); 
+break;
+case 22:
+ this.$ = $$[$0-2]; lastItem($$[$0-2]).data.push({ bar: $$[$0-1] }); $$[$0-2].push({ data: [] }); 
+break;
+case 23:
+this.$ = { data: [$$[$0-1]] };
+break;
+case 24:
+ this.$ = $$[$0-2]; $$[$0-2].data.push($$[$0-1]); 
+break;
+case 25:
+this.$ = 'single';
+break;
+case 26:
+this.$ = 'double';
+break;
+case 27:
+this.$ = 'end';
+break;
+case 28:
+this.$ = 'repeat-begin';
+break;
+case 29:
+this.$ = 'repeat-end';
+break;
+case 30:
+this.$ = 'repeat-both';
+break;
+case 32:
+ this.$ = $$[$0-1]; onlyProperty($$[$0-1]).tie = '~'; 
+break;
+case 33:
+this.$ = { rest: { duration: $$[$0] } };
+break;
+case 34:
+this.$ = { voice: $$[$0] };
+break;
+case 36:
+ this.$ = $$[$0-1]; onlyProperty($$[$0-1]).duration = $$[$0]; 
+break;
+case 37:
+
+      this.$ = $$[$0-1];
+      extend(onlyProperty($$[$0-1]), {
+        duration: $$[$0],
+        slur: { begin: 'solid' }
+      });
+    
+break;
+case 38:
+
+      this.$ = $$[$0-2];
+      extend(onlyProperty($$[$0-2]), {
+        duration: $$[$0-1],
+        slur: { end: 'solid' }
+      });
+    
+break;
+case 39:
+
+      this.$ = $$[$0-2];
+      extend(onlyProperty($$[$0-2]), {
+        duration: $$[$0-1],
+        slur: { begin: 'solid', end: 'solid' }
+      });
+    
+break;
+case 40:
+this.$ = { note: $$[$0] };
+break;
+case 41:
+this.$ = { chord: $$[$0] };
+break;
+case 42:
+this.$ = { pitch: $$[$0] };
+break;
+case 43:
+this.$ = { step: +$$[$0] };
+break;
+case 44:
+this.$ = { step: +$$[$0-1], octave: octave($$[$0]) };
+break;
+case 45:
+this.$ = { accidental: $$[$0-1], step: +$$[$0] };
+break;
+case 46:
+this.$ = { accidental: $$[$0-2], step: +$$[$0-1], octave: octave($$[$0]) };
+break;
+case 48:
+this.$ = { type: $$[$0] };
+break;
+case 49:
+this.$ = { type: 4, dot: $$[$0].length };
+break;
+case 50:
+this.$ = { type: $$[$0-1], dot: $$[$0].length };
+break;
+case 51:
+this.$ = 8;
+break;
+case 52:
+this.$ = 16;
+break;
+case 53:
+this.$ = 32;
+break;
+case 54:
+this.$ = 64;
+break;
+case 55:
+this.$ = 128;
+break;
+case 56:
+this.$ = 256;
+break;
+case 57:
+this.$ = 2;
+break;
+case 58:
+this.$ = 1;
+break;
+case 59:
+this.$ = { pitches: $$[$0-1] };
+break;
+case 61: case 66:
+ this.$ = $$[$0-1]; $$[$0-1].push($$[$0]); 
+break;
+case 62:
+this.$ = $$[$0-1];
+break;
+case 64:
+ this.$ = $$[$0-2]; $$[$0-2].push($$[$0-1]); 
+break;
+case 67:
+this.$ = { time: { beats: +$$[$0-1], beatType: +$$[$0] } };
+break;
+}
+},
+table: [{3:1,4:2,5:[2,2],6:3,8:4,9:[1,5],10:[1,6],11:7,12:8,13:9,14:$V0,16:10,17:12,18:13,19:14,20:21,21:$V1,22:$V2,23:$V3,24:$V4,25:$V5,26:$V6,27:22,29:$V7,31:24,32:25,33:26,34:$V8,36:30,37:31,38:32,39:$V9,41:$Va,48:$Vb,51:$Vc,58:$Vd},{1:[3]},{5:[1,36]},o($Ve,$Vf,{7:37}),{5:[2,5]},o($Ve,[2,6]),o($Ve,[2,7]),{5:[2,11],12:38,16:10,17:12,18:13,19:14,20:21,21:$V1,22:$V2,23:$V3,24:$V4,25:$V5,26:$V6,27:22,29:$V7,31:24,32:25,33:26,34:$V8,36:30,37:31,38:32,39:$V9,41:$Va,48:$Vb,51:$Vc,58:$Vd},{5:[2,12]},o($Vg,$Vf,{7:39}),{5:[2,17]},o($Vg,[2,15],{15:[1,40]}),{5:[2,18],18:41,21:$V1,22:$V2,23:$V3,24:$V4,25:$V5,26:$V6},o([9,10,29,34,39,41,48,51,58],$Vf,{7:42}),o($Vh,[2,20],{27:22,31:24,32:25,33:26,36:30,37:31,38:32,20:43,29:$V7,34:$V8,39:$V9,41:$Va,48:$Vb,51:$Vc,58:$Vd}),o($Vg,[2,25]),o($Vg,[2,26]),o($Vg,[2,27]),o($Vg,[2,28]),o($Vg,[2,29]),o($Vg,[2,30]),o($Vg,$Vf,{7:44}),o($Vg,[2,31],{28:[1,45]}),o($Vg,$Vi,{30:46,42:47,43:$Vj,44:$Vk,45:$Vl,46:$Vm,47:$Vn}),o($Vg,[2,34]),o($Vg,[2,35]),o($Vo,$Vi,{42:47,30:53,43:$Vj,44:$Vk,45:$Vl,46:$Vm,47:$Vn}),{33:54,36:30,37:31,38:32,39:$V9,41:$Va,48:$Vb},{52:55,54:[1,56]},{59:[1,57]},o($Vp,[2,40]),o($Vp,[2,41]),o($Vp,[2,42]),{38:59,39:$V9,41:$Va,49:58},o($Vq,[2,43],{40:[1,60]}),{39:[1,61]},{1:[2,1]},{5:[2,3],8:62,9:$Vr,10:$Vs,11:7,12:8,13:9,14:$V0,16:10,17:12,18:13,19:14,20:21,21:$V1,22:$V2,23:$V3,24:$V4,25:$V5,26:$V6,27:22,29:$V7,31:24,32:25,33:26,34:$V8,36:30,37:31,38:32,39:$V9,41:$Va,48:$Vb,51:$Vc,58:$Vd},{5:[2,13]},o($Vt,[2,14],{9:$Vr,10:$Vs}),o($Vg,[2,16]),o($Vg,$Vf,{7:65}),{9:$Vr,10:$Vs,17:66,19:14,20:21,27:22,29:$V7,31:24,32:25,33:26,34:$V8,36:30,37:31,38:32,39:$V9,41:$Va,48:$Vb,51:$Vc,58:$Vd},o($Vg,$Vf,{7:67}),o($Vt,[2,23],{9:$Vr,10:$Vs}),o($Vg,[2,32]),o($Vg,[2,33]),o($Vo,[2,48],{43:[1,68]}),o($Vo,[2,49]),o($Vu,[2,51]),o($Vu,[2,52],{44:[1,69],45:[1,70]}),o($Vu,[2,57]),o($Vu,[2,58]),o($Vv,[2,36],{35:[1,71]}),o($Vo,$Vi,{42:47,30:72,43:$Vj,44:$Vk,45:$Vl,46:$Vm,47:$Vn}),{53:[1,73]},{53:[2,63],55:[1,74]},o($Vg,[2,67]),{38:76,39:$V9,41:$Va,50:[1,75]},o($Vw,[2,60]),o($Vq,[2,44]),o($Vq,[2,45],{40:[1,77]}),{5:[2,4]},o($Ve,[2,9]),o($Ve,[2,10]),o($Vh,[2,22],{20:21,27:22,31:24,32:25,33:26,36:30,37:31,38:32,19:78,9:$Vr,10:$Vs,29:$V7,34:$V8,39:$V9,41:$Va,48:$Vb,51:$Vc,58:$Vd}),{5:[2,19],18:41,21:$V1,22:$V2,23:$V3,24:$V4,25:$V5,26:$V6},o($Vt,[2,24],{9:$Vr,10:$Vs}),o($Vo,[2,50]),o($Vu,[2,53]),o($Vu,[2,54],{44:[1,79],45:[1,80]}),o($Vv,[2,38]),o($Vv,[2,37],{35:[1,81]}),o($Vg,[2,62]),{27:83,33:26,34:$V8,36:30,37:31,38:32,39:$V9,41:$Va,48:$Vb,56:82,57:[1,84]},o($Vp,[2,59]),o($Vw,[2,61]),o($Vq,[2,46]),o($Vh,[2,21],{27:22,31:24,32:25,33:26,36:30,37:31,38:32,20:43,29:$V7,34:$V8,39:$V9,41:$Va,48:$Vb,51:$Vc,58:$Vd}),o($Vu,[2,55]),o($Vu,[2,56]),o($Vv,[2,39]),{53:[2,64]},{53:[2,65]},{27:85,33:26,34:$V8,36:30,37:31,38:32,39:$V9,41:$Va,48:$Vb},{53:[2,66]}],
+defaultActions: {4:[2,5],8:[2,12],10:[2,17],36:[2,1],38:[2,13],62:[2,4],82:[2,64],83:[2,65],85:[2,66]},
+parseError: function parseError(str, hash) {
+    if (hash.recoverable) {
+        this.trace(str);
+    } else {
+        throw new Error(str);
+    }
+},
+parse: function parse(input) {
+    var self = this, stack = [0], tstack = [], vstack = [null], lstack = [], table = this.table, yytext = '', yylineno = 0, yyleng = 0, recovering = 0, TERROR = 2, EOF = 1;
+    var args = lstack.slice.call(arguments, 1);
+    var lexer = Object.create(this.lexer);
+    var sharedState = { yy: {} };
+    for (var k in this.yy) {
+        if (Object.prototype.hasOwnProperty.call(this.yy, k)) {
+            sharedState.yy[k] = this.yy[k];
+        }
+    }
+    lexer.setInput(input, sharedState.yy);
+    sharedState.yy.lexer = lexer;
+    sharedState.yy.parser = this;
+    if (typeof lexer.yylloc == 'undefined') {
+        lexer.yylloc = {};
+    }
+    var yyloc = lexer.yylloc;
+    lstack.push(yyloc);
+    var ranges = lexer.options && lexer.options.ranges;
+    if (typeof sharedState.yy.parseError === 'function') {
+        this.parseError = sharedState.yy.parseError;
+    } else {
+        this.parseError = Object.getPrototypeOf(this).parseError;
+    }
+    function popStack(n) {
+        stack.length = stack.length - 2 * n;
+        vstack.length = vstack.length - n;
+        lstack.length = lstack.length - n;
+    }
+    _token_stack:
+        function lex() {
+            var token;
+            token = lexer.lex() || EOF;
+            if (typeof token !== 'number') {
+                token = self.symbols_[token] || token;
+            }
+            return token;
+        }
+    var symbol, preErrorSymbol, state, action, a, r, yyval = {}, p, len, newState, expected;
+    while (true) {
+        state = stack[stack.length - 1];
+        if (this.defaultActions[state]) {
+            action = this.defaultActions[state];
+        } else {
+            if (symbol === null || typeof symbol == 'undefined') {
+                symbol = lex();
+            }
+            action = table[state] && table[state][symbol];
+        }
+                    if (typeof action === 'undefined' || !action.length || !action[0]) {
+                var errStr = '';
+                expected = [];
+                for (p in table[state]) {
+                    if (this.terminals_[p] && p > TERROR) {
+                        expected.push('\'' + this.terminals_[p] + '\'');
+                    }
+                }
+                if (lexer.showPosition) {
+                    errStr = 'Parse error on line ' + (yylineno + 1) + ':\n' + lexer.showPosition() + '\nExpecting ' + expected.join(', ') + ', got \'' + (this.terminals_[symbol] || symbol) + '\'';
+                } else {
+                    errStr = 'Parse error on line ' + (yylineno + 1) + ': Unexpected ' + (symbol == EOF ? 'end of input' : '\'' + (this.terminals_[symbol] || symbol) + '\'');
+                }
+                this.parseError(errStr, {
+                    text: lexer.match,
+                    token: this.terminals_[symbol] || symbol,
+                    line: lexer.yylineno,
+                    loc: yyloc,
+                    expected: expected
+                });
+            }
+        if (action[0] instanceof Array && action.length > 1) {
+            throw new Error('Parse Error: multiple actions possible at state: ' + state + ', token: ' + symbol);
+        }
+        switch (action[0]) {
+        case 1:
+            stack.push(symbol);
+            vstack.push(lexer.yytext);
+            lstack.push(lexer.yylloc);
+            stack.push(action[1]);
+            symbol = null;
+            if (!preErrorSymbol) {
+                yyleng = lexer.yyleng;
+                yytext = lexer.yytext;
+                yylineno = lexer.yylineno;
+                yyloc = lexer.yylloc;
+                if (recovering > 0) {
+                    recovering--;
+                }
+            } else {
+                symbol = preErrorSymbol;
+                preErrorSymbol = null;
+            }
+            break;
+        case 2:
+            len = this.productions_[action[1]][1];
+            yyval.$ = vstack[vstack.length - len];
+            yyval._$ = {
+                first_line: lstack[lstack.length - (len || 1)].first_line,
+                last_line: lstack[lstack.length - 1].last_line,
+                first_column: lstack[lstack.length - (len || 1)].first_column,
+                last_column: lstack[lstack.length - 1].last_column
+            };
+            if (ranges) {
+                yyval._$.range = [
+                    lstack[lstack.length - (len || 1)].range[0],
+                    lstack[lstack.length - 1].range[1]
+                ];
+            }
+            r = this.performAction.apply(yyval, [
+                yytext,
+                yyleng,
+                yylineno,
+                sharedState.yy,
+                action[1],
+                vstack,
+                lstack
+            ].concat(args));
+            if (typeof r !== 'undefined') {
+                return r;
+            }
+            if (len) {
+                stack = stack.slice(0, -1 * len * 2);
+                vstack = vstack.slice(0, -1 * len);
+                lstack = lstack.slice(0, -1 * len);
+            }
+            stack.push(this.productions_[action[1]][0]);
+            vstack.push(yyval.$);
+            lstack.push(yyval._$);
+            newState = table[stack[stack.length - 2]][stack[stack.length - 1]];
+            stack.push(newState);
+            break;
+        case 3:
+            return true;
+        }
+    }
+    return true;
+}};
+
+
+  var extend = musje.extend;
+
+  function lastItem(arr) { return arr[arr.length - 1]; }
+
+  function onlyProperty(obj) {
+    return obj[Object.keys(obj)[0]];
+  }
+
+  function octave(str) {
+    var len = str.length;
+    return str.charAt(0) === ',' ? -len : len;
+  }
+
+  function removeLastEmptyMeasure(score) {
+    var parts = score.parts;
+    if (!parts) { return; }
+
+    parts.forEach(function (part) {
+      var lastMeasure = lastItem(part.measures);
+      if (lastMeasure.data.length === 0) {
+        part.measures.pop();
+      }
+    });
+  }
+
+/* generated by jison-lex 0.3.4 */
+var lexer = (function(){
+var lexer = ({
+
+EOF:1,
+
+parseError:function parseError(str, hash) {
+        if (this.yy.parser) {
+            this.yy.parser.parseError(str, hash);
+        } else {
+            throw new Error(str);
+        }
+    },
+
+// resets the lexer, sets new input
+setInput:function (input, yy) {
+        this.yy = yy || this.yy || {};
+        this._input = input;
+        this._more = this._backtrack = this.done = false;
+        this.yylineno = this.yyleng = 0;
+        this.yytext = this.matched = this.match = '';
+        this.conditionStack = ['INITIAL'];
+        this.yylloc = {
+            first_line: 1,
+            first_column: 0,
+            last_line: 1,
+            last_column: 0
+        };
+        if (this.options.ranges) {
+            this.yylloc.range = [0,0];
+        }
+        this.offset = 0;
+        return this;
+    },
+
+// consumes and returns one char from the input
+input:function () {
+        var ch = this._input[0];
+        this.yytext += ch;
+        this.yyleng++;
+        this.offset++;
+        this.match += ch;
+        this.matched += ch;
+        var lines = ch.match(/(?:\r\n?|\n).*/g);
+        if (lines) {
+            this.yylineno++;
+            this.yylloc.last_line++;
+        } else {
+            this.yylloc.last_column++;
+        }
+        if (this.options.ranges) {
+            this.yylloc.range[1]++;
+        }
+
+        this._input = this._input.slice(1);
+        return ch;
+    },
+
+// unshifts one char (or a string) into the input
+unput:function (ch) {
+        var len = ch.length;
+        var lines = ch.split(/(?:\r\n?|\n)/g);
+
+        this._input = ch + this._input;
+        this.yytext = this.yytext.substr(0, this.yytext.length - len);
+        //this.yyleng -= len;
+        this.offset -= len;
+        var oldLines = this.match.split(/(?:\r\n?|\n)/g);
+        this.match = this.match.substr(0, this.match.length - 1);
+        this.matched = this.matched.substr(0, this.matched.length - 1);
+
+        if (lines.length - 1) {
+            this.yylineno -= lines.length - 1;
+        }
+        var r = this.yylloc.range;
+
+        this.yylloc = {
+            first_line: this.yylloc.first_line,
+            last_line: this.yylineno + 1,
+            first_column: this.yylloc.first_column,
+            last_column: lines ?
+                (lines.length === oldLines.length ? this.yylloc.first_column : 0)
+                 + oldLines[oldLines.length - lines.length].length - lines[0].length :
+              this.yylloc.first_column - len
+        };
+
+        if (this.options.ranges) {
+            this.yylloc.range = [r[0], r[0] + this.yyleng - len];
+        }
+        this.yyleng = this.yytext.length;
+        return this;
+    },
+
+// When called from action, caches matched text and appends it on next action
+more:function () {
+        this._more = true;
+        return this;
+    },
+
+// When called from action, signals the lexer that this rule fails to match the input, so the next matching rule (regex) should be tested instead.
+reject:function () {
+        if (this.options.backtrack_lexer) {
+            this._backtrack = true;
+        } else {
+            return this.parseError('Lexical error on line ' + (this.yylineno + 1) + '. You can only invoke reject() in the lexer when the lexer is of the backtracking persuasion (options.backtrack_lexer = true).\n' + this.showPosition(), {
+                text: "",
+                token: null,
+                line: this.yylineno
+            });
+
+        }
+        return this;
+    },
+
+// retain first n characters of the match
+less:function (n) {
+        this.unput(this.match.slice(n));
+    },
+
+// displays already matched input, i.e. for error messages
+pastInput:function () {
+        var past = this.matched.substr(0, this.matched.length - this.match.length);
+        return (past.length > 20 ? '...':'') + past.substr(-20).replace(/\n/g, "");
+    },
+
+// displays upcoming input, i.e. for error messages
+upcomingInput:function () {
+        var next = this.match;
+        if (next.length < 20) {
+            next += this._input.substr(0, 20-next.length);
+        }
+        return (next.substr(0,20) + (next.length > 20 ? '...' : '')).replace(/\n/g, "");
+    },
+
+// displays the character position where the lexing error occurred, i.e. for error messages
+showPosition:function () {
+        var pre = this.pastInput();
+        var c = new Array(pre.length + 1).join("-");
+        return pre + this.upcomingInput() + "\n" + c + "^";
+    },
+
+// test the lexed token: return FALSE when not a match, otherwise return token
+test_match:function (match, indexed_rule) {
+        var token,
+            lines,
+            backup;
+
+        if (this.options.backtrack_lexer) {
+            // save context
+            backup = {
+                yylineno: this.yylineno,
+                yylloc: {
+                    first_line: this.yylloc.first_line,
+                    last_line: this.last_line,
+                    first_column: this.yylloc.first_column,
+                    last_column: this.yylloc.last_column
+                },
+                yytext: this.yytext,
+                match: this.match,
+                matches: this.matches,
+                matched: this.matched,
+                yyleng: this.yyleng,
+                offset: this.offset,
+                _more: this._more,
+                _input: this._input,
+                yy: this.yy,
+                conditionStack: this.conditionStack.slice(0),
+                done: this.done
+            };
+            if (this.options.ranges) {
+                backup.yylloc.range = this.yylloc.range.slice(0);
+            }
+        }
+
+        lines = match[0].match(/(?:\r\n?|\n).*/g);
+        if (lines) {
+            this.yylineno += lines.length;
+        }
+        this.yylloc = {
+            first_line: this.yylloc.last_line,
+            last_line: this.yylineno + 1,
+            first_column: this.yylloc.last_column,
+            last_column: lines ?
+                         lines[lines.length - 1].length - lines[lines.length - 1].match(/\r?\n?/)[0].length :
+                         this.yylloc.last_column + match[0].length
+        };
+        this.yytext += match[0];
+        this.match += match[0];
+        this.matches = match;
+        this.yyleng = this.yytext.length;
+        if (this.options.ranges) {
+            this.yylloc.range = [this.offset, this.offset += this.yyleng];
+        }
+        this._more = false;
+        this._backtrack = false;
+        this._input = this._input.slice(match[0].length);
+        this.matched += match[0];
+        token = this.performAction.call(this, this.yy, this, indexed_rule, this.conditionStack[this.conditionStack.length - 1]);
+        if (this.done && this._input) {
+            this.done = false;
+        }
+        if (token) {
+            return token;
+        } else if (this._backtrack) {
+            // recover context
+            for (var k in backup) {
+                this[k] = backup[k];
+            }
+            return false; // rule action called reject() implying the next rule should be tested instead.
+        }
+        return false;
+    },
+
+// return next match in input
+next:function () {
+        if (this.done) {
+            return this.EOF;
+        }
+        if (!this._input) {
+            this.done = true;
+        }
+
+        var token,
+            match,
+            tempMatch,
+            index;
+        if (!this._more) {
+            this.yytext = '';
+            this.match = '';
+        }
+        var rules = this._currentRules();
+        for (var i = 0; i < rules.length; i++) {
+            tempMatch = this._input.match(this.rules[rules[i]]);
+            if (tempMatch && (!match || tempMatch[0].length > match[0].length)) {
+                match = tempMatch;
+                index = i;
+                if (this.options.backtrack_lexer) {
+                    token = this.test_match(tempMatch, rules[i]);
+                    if (token !== false) {
+                        return token;
+                    } else if (this._backtrack) {
+                        match = false;
+                        continue; // rule action called reject() implying a rule MISmatch.
+                    } else {
+                        // else: this is a lexer rule which consumes input without producing a token (e.g. whitespace)
+                        return false;
+                    }
+                } else if (!this.options.flex) {
+                    break;
+                }
+            }
+        }
+        if (match) {
+            token = this.test_match(match, rules[index]);
+            if (token !== false) {
+                return token;
+            }
+            // else: this is a lexer rule which consumes input without producing a token (e.g. whitespace)
+            return false;
+        }
+        if (this._input === "") {
+            return this.EOF;
+        } else {
+            return this.parseError('Lexical error on line ' + (this.yylineno + 1) + '. Unrecognized text.\n' + this.showPosition(), {
+                text: "",
+                token: null,
+                line: this.yylineno
+            });
+        }
+    },
+
+// return next match that has a token
+lex:function lex() {
+        var r = this.next();
+        if (r) {
+            return r;
+        } else {
+            return this.lex();
+        }
+    },
+
+// activates a new lexer condition state (pushes the new lexer condition state onto the condition stack)
+begin:function begin(condition) {
+        this.conditionStack.push(condition);
+    },
+
+// pop the previously active lexer condition state off the condition stack
+popState:function popState() {
+        var n = this.conditionStack.length - 1;
+        if (n > 0) {
+            return this.conditionStack.pop();
+        } else {
+            return this.conditionStack[0];
+        }
+    },
+
+// produce the lexer rule set which is active for the currently active lexer condition state
+_currentRules:function _currentRules() {
+        if (this.conditionStack.length && this.conditionStack[this.conditionStack.length - 1]) {
+            return this.conditions[this.conditionStack[this.conditionStack.length - 1]].rules;
+        } else {
+            return this.conditions["INITIAL"].rules;
+        }
+    },
+
+// return the currently active lexer condition state; when an index argument is provided it produces the N-th previous condition state, if available
+topState:function topState(n) {
+        n = this.conditionStack.length - 1 - Math.abs(n || 0);
+        if (n >= 0) {
+            return this.conditionStack[n];
+        } else {
+            return "INITIAL";
+        }
+    },
+
+// alias for begin(condition)
+pushState:function pushState(condition) {
+        this.begin(condition);
+    },
+
+// return the number of states currently on the stack
+stateStackSize:function stateStackSize() {
+        return this.conditionStack.length;
+    },
+options: {},
+performAction: function anonymous(yy,yy_,$avoiding_name_collisions,YY_START) {
+var YYSTATE=YY_START;
+switch($avoiding_name_collisions) {
+case 0:return 9
+break;
+case 1:return 9
+break;
+case 2:return 9
+break;
+case 3: this.begin('title'); 
+break;
+case 4: yy_.yytext = yy_.yytext.substr(0, yy_.yyleng - 2).trim();
+                          return 14; 
+break;
+case 5: this.begin('INITIAL'); 
+break;
+case 6: this.begin('INITIAL');
+                          yy_.yytext = yy_.yytext.trim();
+                          return 15; 
+break;
+case 7: this.begin('time');
+                          yy_.yytext = yy_.yytext.substr(0, yy_.yyleng - 1);
+                          return 58; 
+break;
+case 8: this.begin('INITIAL'); return 59; 
+break;
+case 9:return 41
+break;
+case 10:return 39
+break;
+case 11:return 40
+break;
+case 12:return 43
+break;
+case 13:return 47
+break;
+case 14:return 46
+break;
+case 15:return 28
+break;
+case 16:return 44
+break;
+case 17:return 45
+break;
+case 18:return '.'
+break;
+case 19:return 29
+break;
+case 20:return 48
+break;
+case 21:return 50
+break;
+case 22:return 34
+break;
+case 23:return 35
+break;
+case 24:return '/'
+break;
+case 25:return '\\'
+break;
+case 26:return 23
+break;
+case 27:return 22
+break;
+case 28:return '[|'
+break;
+case 29:return 24
+break;
+case 30:return 26
+break;
+case 31:return 25
+break;
+case 32:return 21
+break;
+case 33:return 51
+break;
+case 34:return 53
+break;
+case 35:return 55
+break;
+case 36:return 10
+break;
+case 37:return 9
+break;
+case 38:return 5
+break;
+case 39:return 'INVALID'
+break;
+}
+},
+rules: [/^(?:\/\/[^\n]*)/,/^(?:\/\*([\s\S]*?)\*\/)/,/^(?:\/\*[\s\S]*)/,/^(?:<<)/,/^(?:.*>>)/,/^(?:([ \t])*([\n\r]))/,/^(?:.*)/,/^(?:(([1-9]\d{0,2})\/))/,/^(?:([1-9]\d{0,2})[^\d])/,/^(?:(#{1,2}|n|b{1,2}))/,/^(?:[1-7])/,/^(?:,+|'+)/,/^(?:\.+)/,/^(?:( *- *){3})/,/^(?:( *- *))/,/^(?: *~)/,/^(?:[_])/,/^(?:=)/,/^(?:\.)/,/^(?:[0])/,/^(?:<)/,/^(?:>)/,/^(?:\()/,/^(?:\))/,/^(?:\/)/,/^(?:\\)/,/^(?:\|\])/,/^(?:\|\|)/,/^(?:\[\|)/,/^(?:\|:)/,/^(?::\|:)/,/^(?::\|)/,/^(?:\|)/,/^(?:\{)/,/^(?:\})/,/^(?::)/,/^(?:([\n\r]))/,/^(?:([ \t]))/,/^(?:$)/,/^(?:.)/],
+conditions: {"time":{"rules":[8],"inclusive":false},"title":{"rules":[4,5,6],"inclusive":false},"INITIAL":{"rules":[0,1,2,3,7,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39],"inclusive":true}}
+});
+return lexer;
+})();
+parser.lexer = lexer;
+function Parser () {
+  this.yy = {};
+}
+Parser.prototype = parser;parser.Parser = Parser;
+return new Parser;
+})();
+  musje.parser = parser;
+}(musje));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  musje.svgPaths = {
+
+    // https://upload.wikimedia.org/wikipedia/commons/a/a6/Sharp.svg
+    '#': 'M6.102,7.457V2.753L8.102,2.201V6.881L6.102,7.457zM10.04,6.319L8.665,6.713V2.033L10.04,1.649V-0.295L8.665,0.089V-4.69277H8.102V0.234L6.102,0.809V-3.84077H5.571V0.986L4.196,1.371V3.319L5.571,2.935V7.606L4.196,7.989V9.929L5.571,9.545V14.299L6.102,14.29977V9.375L8.102,8.825V13.45077H8.665V8.651L10.04,8.266V6.319z',
+
+    // https://upload.wikimedia.org/wikipedia/commons/3/3a/DoubleSharp.svg
+    '##': 'M5.009,8.30721C4.27443,8.19192 3.52769,8.19209 2.7858,8.19294C2.77007,7.65011 2.85674,7.0729 2.6415,6.56343C2.49821,6.22426 2.22532,5.95665 1.98269,5.68155C1.59552,6.0278 1.27751,6.48475 1.24704,7.01638C1.21706,7.40767 1.23902,7.80085 1.2322,8.19294C0.4904,8.20416-0.25918,8.16828-0.991,8.314C-0.84988,7.5863-0.88195,6.84171-0.86917,6.1048C-0.3043,6.08953 0.30023,6.17101 0.82484,5.92526C1.13441,5.78023 1.39653,5.55295 1.6591,5.33676C1.3173,4.94965 0.87346,4.60861 0.33665,4.57651C-0.06427,4.54485-0.46734,4.56793-0.86917,4.56097C-0.89434,3.82949-0.80895,3.08855-0.96079,2.3663C-0.23733,2.49697 0.50065,2.46343 1.2322,2.47284C1.24306,2.99383 1.18483,3.53381 1.33191,4.0355C1.44414,4.41838 1.74978,4.71293 2.0051,5.01521C2.36553,4.70111 2.69057,4.30706 2.75011,3.81412C2.804,3.36793 2.76123,2.91977 2.7858,2.47284C3.52263,2.45348 4.28215,2.54713 4.99535,2.314C4.88891,3.05711 4.87889,3.81152 4.88717,4.56097C4.36127,4.57582 3.80954,4.51747 3.30955,4.69457C2.92975,4.8291 2.63114,5.12341 2.32869,5.38325C2.65661,5.71867 3.0516,6.02802 3.5403,6.07368C3.98834,6.11554 4.43829,6.09658 4.88717,6.1048C4.89828,6.83958 4.86193,7.5825 5.009,8.30721z',
+
+    // https://upload.wikimedia.org/wikipedia/commons/b/ba/Flat.svg
+    b: 'M8.166,3.657C8.166,4.232 7.950425,4.78273 7.359,5.52188C6.732435,6.30494 6.205,6.75313 5.51,7.28013V3.848C5.668,3.449 5.901,3.126 6.21,2.878C6.518,2.631 6.83,2.507 7.146,2.507C7.668,2.507 7.999,2.803 8.142,3.393C8.158,3.441 8.166,3.529 8.166,3.657zM8.091,1.257C7.66,1.257 7.222,1.376 6.776,1.615C6.33,1.853 5.908,2.172 5.51,2.569V-4.70267H4.947 V7.75213C4.947,8.10413 5.043,8.28013 5.235,8.28013C5.346,8.28013 5.483913,8.18713 5.69,8.06413C6.27334,7.71598 6.636935,7.48332 7.032,7.23788C7.482617,6.95792 7.99,6.631 8.661,5.991C9.124,5.526 9.459,5.057 9.667,4.585C9.874,4.112 9.978,3.644 9.978,3.179C9.978,2.491 9.795,2.002 9.429,1.713C9.015,1.409 8.568,1.257 8.091,1.257z',
+
+    // https://upload.wikimedia.org/wikipedia/commons/f/f4/Music-natural.svg
+    n: 'M 0,14.112V41.52h-1.248V31.248l-6.672,1.728V5.232h1.2v10.704l6.72,-1.824zm-6.72,6.432v7.536l5.472,-1.44v-7.536l-5.472,1.44z',
+
+    ACCIDENTAL_RATIOS: { '#': 0.043, 'n': 0.023, '##': 0.062, b: 0.057 },
+    ACCIDENTAL_SHIFTS: { '#': 1, 'n': 2, '##': -4, b: 0 }
+  };
+
+}(musje));
+
+/* global musje, Snap */
+
+(function (musje) {
+  'use strict';
+
+  var BAR_TO_ID = {
+    single: 'bs', double: 'bd', end: 'be',
+    'repeat-begin': 'brb', 'repeat-end': 'bre', 'repeat-both': 'brbe'
+  };
+
+  var defIds = {
+
+    /**
+     * Def id used in the SVG <defs> element.
+     * ```
+     * id := 't' beats '-' beatType
+     * ```
+     * E.g. `t3-4`
+     * @member
+     * @alias musje.Time#defId
+     * @type {string}
+     * @readonly
+     */
+    Time: function () {
+      return ['t', this.beats, '-', this.beatType].join('');
+    },
+
+    /**
+     * Def id used in the SVG <defs> element.
+     * ```
+     * defId    Bar value
+     * ----------------------
+     * 'bs'   - single
+     * 'bd'   - double
+     * 'be'   - repeat-end
+     * 'brb'  - repeat-begin
+     * 'bre'  - repeat-end
+     * 'brbe' - repeat-both
+     * ```
+     * @member
+     * @alias musje.Bar#defId
+     * @type {string}
+     * @readonly
+     */
+    Bar: function () {
+      return BAR_TO_ID[this.value];
+    },
+
+    /**
+     * Unique def id of the note used in the SVG <defs> element.
+     * ```
+     * defId := 'n' accidental step octave type dot
+     * ```
+     * E.g.
+     * ```
+     * Note     defId
+     * ------------------
+     * 1        n1040
+     * b3-      nb3020
+     * #5'_.    ns5181
+     * 6,,      n6-2
+     * ```
+     * @member
+     * @alias musje.Note#defId
+     * @type {string}
+     * @readonly
+     */
+    Note: function () {
+      var pitch = this.pitch, duration = this.duration;
+      return [
+        'n', pitch.accidental.replace(/#/g, 's'),
+        pitch.step, pitch.octave, duration.type, duration.dot
+      ].join('');
+    },
+
+    /**
+     * Unique def id of the rest used in the SVG <defs> element.
+     * ```
+     * defId := 'r' type dot
+     * ```
+     * E.g.
+     * ```
+     * Rest     defId
+     * ----------------
+     * 0        r40
+     * 0 -      r20
+     * 0=.      r161
+     * ```
+     *
+     * @member
+     * @alias musje.Rest#defId
+     * @type {string}
+     * @readonly
+     */
+    Rest: function () {
+      var duration = this.duration;
+      return 'r' + duration.type + duration.dot;
+    },
+
+    /**
+     * Def id used in the SVG <defs> element.
+     * ```
+     * defId := 'p' accidental step octave
+     * ```
+     * @member
+     * @alias musje.Pitch#defId
+     * @type {string}
+     * @readonly
+     */
+    Pitch: function () {
+      return ['p', this.accidental.replace(/#/g, 's'),
+                   this.step, this.octave].join('');
+    },
+
+    /**
+     * Def id used in the SVG <defs> element.
+     * ```
+     * defId := 'd' type dot
+     * ```
+     * *E.g.*
+     * ```
+     * Note     defId
+     * ----------------
+     * 1.       d41
+     * 1_       d80
+     * 1=       d160
+     * 1-..     d22
+     * ```
+     * @member
+     * @alias musje.Duration#defId
+     * @type {string}
+     * @readonly
+     */
+    Duration: function () {
+      return 'd' + this.type + this.dot;
+    }
+  };
+
+  musje.objEach(defIds, function (getter, className) {
+    Object.defineProperty(musje[className].prototype, 'defId', {
+      get: getter
+    });
+  });
+
+}(musje, Snap));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  /**
+   * @class
+   * @alias musje.Defs
+   * @param {musje.Layout} layout
+   */
+  var Defs = musje.Defs = function (layout) {
+    this._layout = layout;
+  };
+
+  musje.defineProperties(Defs.prototype,
+  /** @lends musje.Defs# */
+  {
+    get: function (musicData) {
+      var id = musicData.defId;
+      return this[id] || (this[id] = this._make(id, musicData));
+    },
+
+    getAccidental: function (accidental) {
+      var id = 'a' + accidental.replace(/#/g, 's');
+      return this[id] ||
+            (this[id] = new Defs.AccidentalDef(id, accidental, this._layout));
+    },
+
+    _make: function (id, musicData) {
+      var maker = '_make' + musicData.$type;
+      return this[maker](id, musicData) || { width: 0, height: 0 };
+    },
+
+    _makeBar: function (id, bar) {
+      return new Defs.BarDef(id, bar, this._layout);
+    },
+
+    _makeTime: function (id, time) {
+      return new Defs.TimeDef(id, time, this._layout);
+    },
+
+    _makeDuration: function (id, duration) {
+      return new Defs.DurationDef(id, duration, this._layout);
+    },
+
+    _getPitch: function (id, pitch, underbar) {
+      return this[id] ||
+            (this[id] = new Defs.PitchDef(id, pitch, underbar, this));
+    },
+
+    /**
+     * Make note.
+     * @param id {string}  Def id.
+     * @param note {musje.Note} Note
+     * @return {Object}
+     */
+    _makeNote: function (id, note) {
+      var
+        underbar = note.duration.underbar,
+        pitchId = note.pitch.defId + underbar,
+        pitchDef = this._getPitch(pitchId, note.pitch, underbar),
+        durationDef = this.get(note.duration);
+
+      return {
+        pitchDef: pitchDef,
+        durationDef: durationDef,
+        height: pitchDef.height,
+        width: pitchDef.width + durationDef.width *
+                                (underbar ? pitchDef.scale.x : 1)
+      };
+    },
+
+    /**
+     * Make rest is a trick to use a note with pitch.step = 0.
+     * @protected
+     * @param  {string} id   [description]
+     * @param  {string} rest [description]
+     * @return {Object}      [description]
+     */
+    _makeRest: function(id, rest) {
+      return this._makeNote(id, new musje.Note({
+        pitch: { step: 0 },
+        duration: rest.duration
+      }));
+    }
+  });
+
+}(musje));
+
+/* global musje */
+
+(function (Defs) {
+  'use strict';
+
+  // @constructor BarDef
+  // SVG definition for barline.
+  var BarDef = Defs.BarDef = function (id, bar, layout) {
+    var
+      lo = layout.options,
+      x = 0,
+      lineWidth;
+
+    this.el = layout.svg.el.g().attr('id', id).toDefs();
+
+    switch (bar.value) {
+    case 'single':
+      lineWidth = lo.thinBarlineWidth;
+      this._addBarline(x, lineWidth);
+      x += lineWidth;
+      break;
+    case 'double':
+      lineWidth = lo.thinBarlineWidth;
+      this._addBarline(x, lineWidth);
+      x += lineWidth + lo.barlineSep;
+      this._addBarline(x, lineWidth);
+      x += lineWidth;
+      break;
+    case 'end':
+      lineWidth = lo.thinBarlineWidth;
+      this._addBarline(x, lineWidth);
+      x += lineWidth + lo.barlineSep;
+      lineWidth = lo.thickBarlineWidth;
+      this._addBarline(x, lineWidth);
+      x += lineWidth;
+      break;
+    case 'repeat-begin':
+      lineWidth = lo.thickBarlineWidth;
+      this._addBarline(x, lineWidth);
+      x += lineWidth + lo.barlineSep;
+      lineWidth = lo.thinBarlineWidth;
+      this._addBarline(x, lineWidth);
+      x += lineWidth + lo.barlineDotSep + lo.barlineDotRadius;
+      break;
+    case 'repeat-end':
+      x = lo.barlineDotSep + lo.barlineDotRadius;
+      lineWidth = lo.thinBarlineWidth;
+      this._addBarline(x, lineWidth);
+      x += lineWidth + lo.barlineSep;
+      lineWidth = lo.thickBarlineWidth;
+      this._addBarline(x, lineWidth);
+      x += lineWidth;
+      break;
+    case 'repeat-both':
+      x = lo.barlineDotSep + lo.barlineDotRadius;
+      lineWidth = lo.thinBarlineWidth;
+      this._addBarline(x, lineWidth);
+      x += lineWidth + lo.barlineSep;
+      lineWidth = lo.thickBarlineWidth;
+      this._addBarline(x, lineWidth);
+      x += lineWidth + lo.barlineSep;
+      lineWidth = lo.thinBarlineWidth;
+      this._addBarline(x, lineWidth);
+      x += lineWidth + lo.barlineDotSep + lo.barlineDotRadius;
+      break;
+    }
+
+    this.width = x;
+  };
+
+  BarDef.prototype._addBarline = function (x, width) {
+    this.el.rect(x, 0, width, 1);
+  };
+
+}(musje.Defs));
+
+/* global musje, Snap */
+
+(function (Defs, Snap) {
+  'use strict';
+
+  // @constructor TimeDef
+  // SVG definition for Time signature.
+  Defs.TimeDef = function (id, time, layout) {
+    var
+      lo = layout.options,
+      timeFontSize = lo.timeFontSize,
+      lineExtend = timeFontSize * 0.1,
+      el = this.el = layout.svg.el.g()
+        .attr({
+          id: id,
+          fontSize: timeFontSize,
+          fontWeight: lo.timeFontWeight,
+          textAnchor: 'middle'
+        }),
+      lineY = -0.85 * timeFontSize,
+      bb;
+
+    el.text(0, -1 * timeFontSize, time.beats);
+    el.text(0, 0, time.beatType);   // baseline y = 0
+    bb = el.getBBox();
+    el.line(bb.x - lineExtend, lineY, bb.x2 + lineExtend, lineY);
+    el.transform(Snap.matrix().scale(1, 0.8).translate(lineExtend - bb.x, 0));
+
+    bb = el.getBBox();
+    el.toDefs();
+
+    this.width = bb.width;
+    this.height = -bb.y;
+  };
+
+}(musje.Defs, Snap));
+
+/* global musje, Snap */
+
+(function (Defs, Snap) {
+  'use strict';
+
+  var svgPaths = musje.svgPaths;
+
+  // @constructor AccidentalDef
+  // SVG definition for accidental
+  Defs.AccidentalDef = function (id, accidental, layout) {
+    var
+      lo = layout.options,
+      el = this.el = layout.svg.el.g().attr('id', id),
+      accKey = accidental.replace(/bb/, 'b'), // double flat to be synthesized
+      pathData = svgPaths[accKey],
+      ratio = svgPaths.ACCIDENTAL_RATIOS[accKey],
+      shift = svgPaths.ACCIDENTAL_SHIFTS[accKey],
+      path = el.path(pathData),
+      bb = el.getBBox();
+
+    path.transform(Snap.matrix()
+      .translate(0.1 * lo.accidentalShift, -lo.accidentalShift)
+      .scale(ratio * lo.accidentalFontSize)
+      .translate(-bb.x, shift - bb.y2)
+    );
+
+    // Combine two flat to be double flat.
+    if (accidental === 'bb') {
+      el.use(path).attr('x', lo.accidentalFontSize * 0.24);
+      el.transform('scale(0.9,1)');
+    }
+
+    bb = el.getBBox();
+    this.width = bb.width * 1.2;
+
+    el.toDefs();
+  };
+
+}(musje.Defs, Snap));
+
+/* global musje, Snap */
+
+(function (musje, Snap) {
+  'use strict';
+
+  var
+    extend = musje.extend,
+    near = musje.near;
+
+  function getBBoxAfterTransform(container, bbox, matrix) {
+    var
+      rect = container.rect(bbox.x, bbox.y, bbox.width, bbox.height),
+      g = container.g(rect);
+
+    rect.transform(matrix);
+    bbox = g.getBBox();
+    g.remove();
+    return bbox;
+  }
+
+  function getScale(hasAccidental, octave, underbar) {
+    var absOctave = Math.abs(octave);
+    return {
+      x: 1,
+      y: 1
+    };
+  }
+
+  /**
+   * SVG definition for pitch.
+   * The `PitchDef` is defined by properties: a s o u
+   * accidental step octave underbar
+   * @class
+   */
+  musje.Defs.PitchDef = function (id, pitch, underbar, defs) {
+    var
+      layout = this._layout = defs._layout,
+      accidental = pitch.accidental,
+      octave = pitch.octave,
+      scale = getScale(accidental, octave, underbar),
+      el = this.el = layout.svg.el.g().attr({
+        id: id,
+        stroke: 'black',
+        strokeWidth: 2 - (scale.x + scale.y)
+      }),
+      matrix,
+      sbbox,
+      pbbox;
+
+    this._defs = defs;
+    this._addAccidental(accidental);
+    this._addStep(pitch.step);
+    this._addOctave(octave, underbar);
+
+    matrix = this._getMatrix(scale, octave, underbar);
+    el.transform(matrix);
+
+    sbbox = this._sbbox;
+    sbbox = getBBoxAfterTransform(this.el, sbbox, matrix);
+
+    pbbox = el.getBBox();
+    el.toDefs();
+
+    extend(this, {
+      scale: scale,
+      matrix: matrix,
+      width: pbbox.width,
+      height: -pbbox.y,
+      stepCx: sbbox.cx,
+      stepY: sbbox.y,
+      stepCy: sbbox.cy,
+      stepY2: sbbox.y2,
+      stepTop:  (octave > 0 ? (pbbox.y  - defaultFontsize * 0.2): sbbox.y)
+    });
+  };
+
+  musje.defineProperties(musje.Defs.PitchDef.prototype,
+  /** @lends musje.Defs.PitchDef# */
+  {
+
+    _addAccidental: function (accidental) {
+      if (!accidental) {
+        this._accidentalX2 = 0;
+        return;
+      }
+
+      var
+        accDef = this._defs.getAccidental(accidental);
+
+      this.el.use(accDef.el).attr('y', -this._layout.options.accidentalShift);
+      this._accidentalX2 = accDef.width;
+    },
+
+    _addStep: function (step) {
+      this._sbbox = this.el
+        .text(this._accidentalX2, 0, '' + step)
+        .attr('font-size', defaultFontsize)
+        .getBBox();
+    },
+
+    _addOctave: function (octave, underbar) {
+      if (!octave) { return; }
+
+      var
+        lo = this._layout.options,
+        octaveRadius = lo.octaveRadius,
+        octaveOffset = lo.octaveOffset,
+        octaveSep = lo.octaveSep,
+        octaveEl = this.el.g(),
+        i;
+
+      if (octave > 0) {
+        for (i = 0; i < octave; i++) {
+          octaveEl.circle(this._sbbox.cx, this._sbbox.y + octaveOffset - octaveSep * i, octaveRadius);
+        }
+      } else {
+        
+        for (i = 0; i > octave; i--) {
+          octaveEl.circle(this._sbbox.cx, underbar * lo.underbarSep + this._sbbox.y2 - octaveOffset - octaveSep * i, octaveRadius);
+        }
+      }
+      this.el.add(octaveEl);
+    },
+
+    // Transform the pitch to be in a good baseline position and
+    // scale it to be more square.
+    _getMatrix: function (scale, octave, underbar) {
+      var
+        lo = this._layout.options,
+        pbbox = this.el.getBBox(),
+        dy = -lo.stepBaselineShift;
+
+      return Snap.matrix()
+        .translate(-pbbox.x, dy)
+        .scale(scale.x, scale.y)
+        .translate(0, 0);
+    }
+
+  });
+
+}(musje, Snap));
+
+/* global musje, Snap */
+
+(function (Defs, Snap) {
+  'use strict';
+
+  // @constructor DurationDef
+  // SVG Definition for duration.
+  var DurationDef = Defs.DurationDef = function (id, duration, layout) {
+    this._id = id;
+    this._layout = layout;
+
+    // only make def el for:
+    // id = d10, d11, d12, d20, d21, d20, d41, d40
+    switch (duration.type) {
+    case 1:   // whole note
+      this._makeEl();
+      this._makeType1(id, duration.dot);
+      break;
+    case 2:   // half note
+      this._makeEl();
+      this._makeType2(id, duration.dot);
+      break;
+    default:  // other note types type quarter note def
+      if (duration.dot === 0) {
+        this.width = 0 ;
+      } else {
+        this._makeEl();
+        this._makeType4(id, duration.dot);
+      }
+    }
+  };
+
+  DurationDef.prototype._makeEl = function () {
+    this.el = this._layout.svg.el.g()
+                .attr('id', this._id)
+                .toDefs();
+  };
+
+  // Add dot for type 1 (whole) or type 2 (half) note.
+  DurationDef.prototype._addDot = function (x, dot, type) {
+    var lo = this._layout.options;
+
+    if (dot > 0) {
+      x += lo.dotOffset * (type === 1 ? 1.2 : 1);
+      this.el.circle(x, 0, lo.dotRadius);
+    }
+    if (dot > 1) {
+      x += lo.dotSep * (type === 1 ? 1.2 : 1);
+      this.el.circle(x, 0, lo.dotRadius);
+    }
+    return x + lo.typebarExt;
+  };
+
+  DurationDef.prototype._makeType1 = function (id, dot) {
+    var
+      lo = this._layout.options,
+      x = lo.typebarOffset;
+
+    this._addLine(x);
+    x += lo.typebarLength + lo.typebarSep;
+    this._addLine(x);
+    x += lo.typebarLength + lo.typebarSep;
+    this._addLine(x);
+    x += lo.typebarLength;
+
+    this.width = this._addDot(x, dot, 1);
+  };
+
+  DurationDef.prototype._addLine = function (x) {
+    var lo = this._layout.options;
+    this.el.rect(x, -lo.typeStrokeWidth,
+                 lo.typebarLength, lo.typeStrokeWidth);
+  };
+
+  DurationDef.prototype._makeType2 = function (id, dot) {
+    var
+      lo = this._layout.options,
+      x = lo.typebarOffset;
+
+    this._addLine(lo.typebarOffset);
+    x += lo.typebarLength;
+    this.width = this._addDot(x, dot, 2);
+  };
+
+  DurationDef.prototype._makeType4 = function (id, dot) {
+    var
+      lo = this._layout.options,
+      x = lo.t4DotOffset;
+
+    this.el.circle(x, -lo.t4DotBaselineShift, lo.dotRadius);
+    if (dot > 1) {
+      x += lo.t4DotSep;
+      this.el.circle(x, -lo.t4DotBaselineShift, lo.dotRadius);
+    }
+    this.width = x + lo.t4DotExt;
+  };
+
+}(musje.Defs, Snap));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  /**
+   * @class
+   * @alias musje.Layout
+   * @param svg {string}
+   * @param options {Object} Layout options
+   */
+  var Layout = musje.Layout = function (svg, options) {
+    this.options = options;
+    this.svg = svg;
+
+    this.svg = new Layout.Svg(this);
+    this.body = new Layout.Body(this);
+    this.header = new Layout.Header(this);
+    this.content = new Layout.Content(this);
+
+    this.defs = new musje.Defs(this);
+  };
+
+  /**
+   * @param  {musje.Score} score
+   */
+  Layout.prototype.flow = function (score) {
+    this._init(score);
+    this.content.flow(score.measures);
+  };
+
+  /**
+   * @param  {musje.Score} score
+   * @protected
+   */
+  Layout.prototype._init = function (score) {
+    var
+      layout = this,
+      measures = score.measures;
+
+    measures.forEach(function (measure, m) {
+      measure = measures[m];
+      measure.layout = layout;
+      measure.parts.forEach(function (cell) {
+        cell.layout = layout;
+        cell.flow();
+      });
+    });
+  };
+
+}(musje));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  var options = musje.Layout.options = {
+    mode: 'block', // inline | block | paper
+    // width: 650,
+    // height: 600,
+    marginTop: 25,
+    marginRight: 30,
+    marginBottom: 25,
+    marginLeft: 30,
+    margin: {
+      get: function () {
+        return [this.marginTop, this.marginRight, this.marginBottom, this.marginLeft];
+      },
+      set: function (arr) {
+        switch (arr.length) {
+        case 1:
+          this.marginTop = this.marginRight = this.marginBottom = this.marginLeft = arr[0];
+          return;
+        case 2:
+          this.marginTop = this.marginBottom = arr[0];
+          this.marginRight = this.marginLeft = arr[1];
+          return;
+        case 4:
+          this.marginTop = arr[0];
+          this.marginRight = arr[1];
+          this.marginBottom = arr[2];
+          this.marginLeft = arr[3];
+          return;
+        default:
+          throw new Error('Invalid input for margin.');
+        }
+      }
+    },
+    fontSize: defaultFontsize,
+    fontFamily: 'Helvetica, Arial, Sans Serif',
+
+    titleFontSize: '110%',
+    // titleFontFamily
+    titleFontWeight: 'bold',
+    composerFontSize: '90%',
+    // composerFontFamily:
+    composerFontWeight: 'bold',
+    // composerFontStyle,
+    timeFontSize: '95%',
+    timeFontWeight: 'bold',
+
+    headerSep: '100%',
+    systemSep: '180%',
+    musicDataSep: '20%',
+
+    partHeight: '120%',
+    partSep: '80%',
+
+    measurePaddingLeft: '50%',
+    measurePaddingRight: '50%',
+
+    barlineHeight: '140%',
+    thinBarlineWidth: '4%',
+    thickBarlineWidth: '16%',
+    barlineSep: '18%',
+    barlineDotRadius: '7.5%',
+    barlineDotSep: '22%',
+
+    accidentalFontSize: '95%',
+    accidentalShift: '10%',
+
+    octaveRadius: '6.6%',
+    octaveOffset: '0%',
+    octaveSep: '23%',
+
+    stepBaselineShift: '12%',  // for step without lower octave and underline
+
+    typeStrokeWidth: '5%',
+    typebarOffset: '30%',   // 1 - - -
+    typebarLength: '55%',   // off len sep len sep len (dot) ext
+    typebarSep: '45%',      // 1 -
+    typebarExt: '20%',      // off len (dot) ext
+    underbarSep: '17%',
+
+    dotOffset: '60%',       // for type = 2
+    dotRadius: '6.6%',      // 1 - . .
+    dotSep: '60%',          // off len dotOff . dotSep . ext
+    t4DotOffset: '30%',
+    t4DotSep: '50%',
+    t4DotExt: '25%',
+    t4DotBaselineShift: '20%'
+  };
+
+  var fontSize = defaultFontsize;
+
+  musje.objEach(options, function (value, key) {
+    if (typeof value !== 'string') { return; }
+
+    var unit = value.replace(/[\d\.]+/, '');
+    value = +value.replace(/[^\d\.]+/, '');
+
+    switch (unit) {
+    case '%':
+      options[key] = fontSize * value / 100;
+      break;
+    case '': // fall through
+    case 'px':
+      options[key] = value;
+      break;
+    case 'others to be implemented':
+      break;
+    }
+  });
+}(musje));
+
+/* global musje, Snap */
+
+(function (Layout, Snap) {
+  'use strict';
+
+  /**
+   * @class
+   * @param layout {musje.Layout}
+   */
+  musje.Layout.Svg = function (layout) {
+    this._layout = layout;
+    var lo = layout.options;
+
+    this.el = Snap(layout.svg).attr({
+        fontFamily: lo.fontFamily
+      }).addClass('musje');
+    this.el.clear();
+
+    this.width = lo.width;
+  };
+
+  musje.defineProperties(musje.Layout.Svg.prototype,
+  /** @lends musje.Layout.Svg# */
+  {
+    /**
+     * Width of the svg.
+     * @type {number}
+     */
+    width: {
+      get: function () {
+        return this._w;
+      },
+      set: function (w) {
+        this._w = w;
+        this.el.attr('width', w);
+        var body = this._layout.body;
+        if (body) { body.width = w; }
+      }
+    },
+
+    /**
+     * Height of the svg.
+     * @type {number}
+     */
+    height: {
+      get: function () {
+        return this._h;
+      },
+      set: function (h) {
+        this._h = h;
+        this.el.attr('height', h);
+      }
+    }
+  });
+
+}(musje.Layout, Snap));
+
+/* global musje, Snap */
+
+(function (musje, Snap) {
+  'use strict';
+
+  /**
+   * Body
+   * @class
+   * @param {musje.Layout} layout
+   */
+  musje.Layout.Body = function (layout) {
+    this._layout = layout;
+    var
+      svg = layout.svg,
+      lo = layout.options;
+
+    this.el = svg.el.g()
+        .transform(Snap.matrix().translate(lo.marginLeft, lo.marginTop))
+        .addClass('mus-body');
+    this.width = lo.width - lo.marginLeft - lo.marginRight;
+  };
+
+  musje.defineProperties(musje.Layout.Body.prototype,
+  /** @lends musje.Layout.Body.prototype */
+  {
+    /**
+     * Width of the body.
+     * - (Getter) Get the body width.
+     * - (Setter) Set the body width and this also induces setting the
+     * header and content width if one exists.
+     * @type {number}
+     */
+    width: {
+      get: function () {
+        return this._w;
+      },
+      set: function (w) {
+        this._w = w;
+        var layout = this._layout;
+        if (layout.header) { layout.header.width = w; }
+        if (layout.content) { layout.content.width = w; }
+      }
+    },
+
+    /**
+     * Height of the body.
+     * - (Getter) Get the body height.
+     * - (Setter) Set the body height and this will also cause the height of svg to vary.
+     * @type {number}
+     */
+    height: {
+      get: function () {
+        return this._h;
+      },
+      set: function (h) {
+        var layout = this._layout, lo = layout.options;
+        layout.svg.height = h + lo.marginTop + lo.marginBottom;
+        this._h = h;
+      }
+    }
+  });
+
+}(musje, Snap));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  /**
+   * Header layout.
+   * @class
+   * @param {musje.Layout} layout
+   */
+  musje.Layout.Header = function (layout) {
+    this._layout = layout;
+    this.el = layout.body.el.g().addClass('mus-header');
+    this.width = layout.body.width;
+  };
+
+  musje.defineProperties(musje.Layout.Header.prototype,
+  /** @lends musje.Layout.Header# */
+  {
+    /**
+     * Width of the header.
+     * @type {number}
+     */
+    width: {
+      get: function () {
+        return this._w;
+      },
+      set: function (w) {
+        this._w = w;
+      }
+    },
+
+    /**
+     * Height of the header.
+     * @type {number}
+     */
+    height: {
+      get: function () {
+        return this._h;
+      },
+      set: function (h) {
+        this._h = h;
+        var layout = this._layout;
+        layout.content.y = h ? h + layout.options.headerSep : 0;
+      }
+    }
+  });
+
+}(musje));
+
+/* global musje, Snap */
+
+(function (musje, Snap) {
+  'use strict';
+
+  /**
+   * @class
+   * @param {Object} layout - Reference to the parent layout instance.
+   */
+  musje.Layout.Content = function (layout) {
+    this.layout = layout;
+    this.el = layout.body.el.g().addClass('mus-content');
+    this.width = layout.body.width;
+  };
+
+  musje.defineProperties(musje.Layout.Content.prototype,
+  /** @lends musje.Layout.Content# */
+  {
+
+    y: {
+      get: function () {
+        return this._y;
+      },
+      set: function (y) {
+        this._y = y;
+        this.el.transform(Snap.matrix().translate(0, y));
+        this._resizeBody();
+      }
+    },
+
+    width: {
+      get: function () {
+        return this._w;
+      },
+      set: function (w) {
+        this._w = w;
+      }
+    },
+
+    height: {
+      get: function () {
+        var last = this.systems[this.systems.length - 1];
+        return last ? last.y + last.height : 0;
+      }
+    },
+
+    _resizeBody: function () {
+      var layout = this.layout, hHeight = layout.header.height;
+
+      layout.body.height = this.height +
+            (hHeight ? hHeight + layout.options.headerSep : 0);
+    },
+
+    /**
+     * Divide measures in timewise score into the systems.
+     * @param scoreMeasure {musje.TimewiseMeasures} The timewise score measure.
+     * @protected
+     */
+    _makeSystems: function (scoreMeasures) {
+      var
+        content = this,
+        layout = this.layout,
+        lo = layout.options,
+        measurePadding = lo.measurePaddingLeft + lo.measurePaddingRight,
+        system = new musje.Layout.System(layout, 0),
+        systems = this.systems = [system];
+
+      scoreMeasures.forEach(function (measure) {
+        var minWidth = measure.minWidth + measurePadding +
+                      (measure.barLeftInSystem.width +
+                       measure.barRightInSystem.width) / 2;
+
+        // Continue put this measure in the system.
+        if (system.minWidth + minWidth < content.width) {
+          system.measures.push(measure);
+
+        // New system
+        } else {
+          system = new musje.Layout.System(layout, systems.length);
+          systems.push(system);
+          system.measures.push(measure);
+        }
+      });
+    },
+
+    _maxLengthSystem: {
+      get:function () {
+        var maxLength = 0, i, system;
+
+        this.systems.forEach(function (system) {
+          maxLength = Math.max(maxLength, system.measures.length);
+        });
+
+        // Find the first max length system backward.
+        for(i = this.systems.length - 1; i >= 0; i--) {
+          system = this.systems[i];
+          if (system.measures.length === maxLength) { return system; }
+        }
+      }
+    },
+
+    _isNotBalancable: {
+      get: function () {
+        var
+          systems = this.systems,
+          len = systems.length;
+
+        return len === 1 ||
+              (len === 2 && systems[1].minWidth < this.width * 0.4);
+      }
+    },
+
+    _balanceSystems: function () {
+      if (this._isNotBalancable) { return; }
+
+      var
+        systems = this.systems,
+        last = systems[systems.length - 1],
+        system = this._maxLengthSystem,
+        next, prev;
+
+      // Move measures down to balance the last system.
+      while (last.measures.length < system.measures.length - 1) {
+
+        // Move a measure tail-to-head downward to the last measure.
+        while (true) {
+          next = system.next;
+          if (!next) { break; }
+          next.measures.unshift(system.measures.pop());
+          system = next;
+        }
+        system = this._maxLengthSystem;
+      }
+
+      // Move back measures if the system exceeds the content width.
+      system = last;
+      while (system) {
+        prev = system.prev;
+        while (system.minWidth > this.width) {
+          prev.measures.push(system.measures.shift());
+        }
+        system = prev;
+      }
+    },
+
+    /**
+     * @param scoreMeasure {musje.TimewiseMeasures} The timewise score measure.
+     */
+    flow: function (scoreMeasures) {
+      this._makeSystems(scoreMeasures);
+      this._balanceSystems();
+      this.systems.forEach(function (system) { system.flow(); });
+    }
+  });
+
+}(musje, Snap));
+
+/* global musje, Snap */
+
+(function (musje, Snap) {
+  'use strict';
+
+  function getPairs(measures) {
+    return measures.map(function (measure) {
+      return {
+        width: measure.minWidth,
+        measure: measure
+      };
+    }).sort(function (a, b) {
+      return b.width - a.width;   // descending sort
+    });
+  }
+
+  /**
+   * @class
+   * @param {number} index
+   * @param {musje.Layout} layout
+   */
+  musje.Layout.System = function (layout, index) {
+
+    /**
+     * Index of the system in systems.
+     * @type {number}
+     * @protected
+     */
+    this._index = index;
+
+    /** @member */
+    this.layout = layout;
+
+    /** @member */
+    this.el = layout.content.el.g().addClass('mus-system');
+    /** @member */
+    this.measures = [];
+  };
+
+  musje.defineProperties(musje.Layout.System.prototype,
+  /** @lends musje.Layout.System# */
+  {
+    prev: {
+      get: function () {
+        return this.layout.content.systems[this._index - 1];
+      }
+    },
+
+    next: {
+      get: function () {
+        return this.layout.content.systems[this._index + 1];
+      }
+    },
+
+    y: {
+      get: function () {
+        return this._y;
+      },
+      set: function (y) {
+        this._y = y;
+        this.el.transform(Snap.matrix().translate(0, y));
+      }
+    },
+
+    width: {
+      get: function () {
+        return this.layout.content.width;
+      }
+    },
+
+    minWidth: {
+      get: function () {
+        var min = 0;
+        this.measures.forEach(function (measure) {
+          min += measure.minWidth;
+        });
+        return min;
+      }
+    },
+
+    content: {
+      get: function () {
+        return this.layout.content;
+      }
+    },
+
+    systems: {
+      get: function () {
+        return this.content.systems;
+      }
+    },
+
+    flow: function () {
+      var
+        system = this,
+        minHeight = 0,
+        x = 0;
+
+      this._tuneMeasuresWidths();
+
+      this.measures.forEach(function (measure, m) {
+
+        /**
+         * Reference to the system.
+         * Produced by {@link musje.Layout.System#flow}
+         * @memberof musje.TimewiseMeasure#
+         * @alias system
+         * @type {musje.Layout.System}
+         * @readonly
+         */
+        measure.system = system;
+
+        /**
+         * Index of this measure in the system.
+         * Produced by {@link musje.Layout.System#flow}
+         * @memberof musje.TimewiseMeasure#
+         * @alias _sIndex
+         * @type {number}
+         * @protected
+         */
+        measure._sIndex = m;
+
+        measure.flow();
+
+        measure.x = x;
+        x += measure.width;
+        minHeight = Math.max(minHeight, measure.minHeight);
+      });
+
+      var prev = this.prev;
+      this.y = prev ? prev.y + prev.height + this.layout.options.systemSep : 0;
+      this.height = minHeight;
+    },
+
+    _isTunable: {
+      get: function () {
+        var
+          ctWidth = this.content.width,
+          s = this._index,
+          ssLen = this.systems.length;
+
+        return ssLen > 2 ||
+           (ssLen === 1 && this.minWidth > ctWidth * 0.7) ||
+           (ssLen === 2 && (s === 0 ||
+                           (s === 1 && this.minWidth > ctWidth * 0.4)));
+      }
+    },
+
+    _tuneMeasuresWidths: function () {
+      if (!this._isTunable) { return; }
+
+      var
+        pairs = getPairs(this.measures),
+        length = pairs.length,
+        widthLeft = this.width,
+        itemLeft = length,
+        i = 0,    // i + itemLeft === length
+        width;
+
+      while (i < length) {
+        if (widthLeft >= pairs[i].width * itemLeft) {
+          width = widthLeft / itemLeft;
+          do {
+            pairs[i].measure.width = width;
+            i++;
+          } while (i < length);
+          break;
+        } else {
+          width = pairs[i].width;
+          pairs[i].measure.width = width;
+          widthLeft -= width;
+          i++;
+          itemLeft--;
+        }
+      }
+    }
+
+  });
+
+}(musje, Snap));
+
+/* global musje, Snap */
+
+(function (musje, Snap) {
+  'use strict';
+
+  /**
+   * TimewiseMeasure Layout mixin.
+   * @mixin
+   */
+  musje.LayoutTimewiseMeasure =
+  /** @lends musje.LayoutTimewiseMeasure# */
+  {
+    /**
+     * Minimun width of the measure.
+     * @type {number}
+     */
+    minWidth: {
+      get: function () {
+        var minWidth = 0;
+        this.parts.forEach(function (cell) {
+          minWidth = Math.max(minWidth, cell.minWidth);
+        });
+        return minWidth + this.padding;
+      }
+    },
+
+    /**
+     * Reference to the parent system of this measure.
+     * - (Getter)
+     * - (Setter) The measure el will be created, and the height of the measure will be set.
+     * @type {musje.Layout.System}
+     */
+    system: {
+      get: function () {
+        return this._s;
+      },
+      set: function (system) {
+        this._s = system;
+
+        /**
+         * Measure SVG group element.
+         * @memberof musje.LayoutTimewiseMeasure#
+         * @alias el
+         * @type {Element}
+         * @readonly
+         */
+        this.el = system.el.g().addClass('mus-measure');
+      }
+    },
+
+    padding: {
+      get: function () {
+        var lo = this.layout.options;
+        return lo.measurePaddingRight + lo.measurePaddingLeft;
+      }
+    },
+
+    outerWidth: {
+      get: function () {
+        return this.outerWidthLeft + this.outerWidthRight;
+      }
+    },
+
+    outerWidthLeft: {
+      get: function () {
+        return this.layout.options.measurePaddingLeft +
+                this.barLeftInSystem.width / 2;
+      }
+    },
+
+    outerWidthRight: {
+      get: function () {
+        return this.layout.options.measurePaddingRight +
+                this.barRightInSystem.width / 2;
+      }
+    },
+
+    /**
+     * Width of the measure.
+     * - (Getter)
+     * - (Setter) Set width of the measure and also set the widths of the containing cells.
+     * @type {number}
+     */
+    width: {
+      get: function () {
+        return this._w || (this._w = this.minWidth);
+      },
+      set: function (w) {
+        this._w = w;
+        var outerWidth = this.outerWidth;
+
+        this.parts.forEach(function (cell) {
+          cell.width = w - outerWidth;
+        });
+      }
+    },
+
+    height: {
+      get: function () {
+        return this.system.height;
+      }
+    },
+
+    minHeight: {
+      get: function () {
+        var
+          minHeight = 0,
+          partSep = this.layout.options.partSep;
+
+        this.parts.forEach(function (cell) {
+          minHeight += cell.height + partSep;
+        });
+        return minHeight ? minHeight - partSep : 0;
+      }
+    },
+
+    /**
+     * The x position of the measure in the system.
+     * - (Getter)
+     * - (Setter) Set x cause the measure element to translate.
+     * @type {number}
+     */
+    x: {
+      get: function () {
+        return this._x;
+      },
+      set: function (x) {
+        this._x = x;
+        this.el.transform(Snap.matrix().translate(x, 0));
+      }
+    },
+
+    /**
+     * If the measure in the beginning of the system.
+     * @type {boolean}
+     * @readonly
+     */
+    inSystemBegin: {
+      get: function () {
+        return this._sIndex === 0;
+      }
+    },
+
+    /**
+     * If the measure in the end of the system.
+     * @type {boolean}
+     * @readonly
+     */
+    inSystemEnd: {
+      get: function () {
+        return this._sIndex === this.system.measures.length - 1;
+      }
+    },
+
+    /**
+     * Left bar of the measure in system.
+     * @type {musje.Bar}
+     * @readonly
+     */
+    barLeftInSystem: {
+      get: function () {
+        return this.parts[0].barLeftInSystem;
+      }
+    },
+
+    /**
+     * Right bar of the measure in system.
+     * @type {musje.Bar}
+     * @readonly
+     */
+    barRightInSystem: {
+      get: function () {
+        return this.parts[0].barRightInSystem;
+      }
+    },
+
+    /**
+     * Flow the measure.
+     */
+    flow: function () {
+      var measure = this;
+      measure.parts.forEach(function (cell) {
+
+        /**
+         * Cell SVG group element.
+         * @memberof musje.LayoutCell#
+         * @alias el
+         * @type {Element}
+         * @readonly
+         */
+        cell.el = measure.el.g().addClass('mus-cell');
+
+        cell.x = measure.outerWidthLeft;
+
+        // cell.drawBox();
+      });
+    },
+
+    /**
+     * Draw box of the cell.
+     * @return {Element} The box SVG rect element.
+     */
+    drawBox: function () {
+      this._boxEl = this.el.rect(0, 0, this.width, this.height)
+                                .attr({ stroke: 'green', fill: 'none' });
+      return this._boxEl;
+    },
+
+    /**
+     * Clear the box SVG element.
+     */
+    clearBox: function () {
+      this._boxEl.remove();
+      this._boxEl = undefined;
+    }
+  };
+
+  musje.defineProperties(musje.TimewiseMeasure.prototype,
+                         musje.LayoutTimewiseMeasure);
+
+}(musje, Snap));
+
+/* global musje, Snap */
+
+(function (musje, Snap) {
+  'use strict';
+
+  /**
+   * @mixin
+   */
+  musje.LayoutCell =
+  /** @lends  musje.LayoutCell# */
+  {
+
+    /**
+     * Width
+     * - (Getter) Get the cell width.
+     * - (Setter) Set the cell width, and this will cause the cell to reflow (`this._reflow()` will be called).
+     * @type {number}
+     */
+    width: {
+      get: function () {
+        return this._w;
+      },
+      set: function (w) {
+        this._w = w;
+        this._reflow();
+      }
+    },
+
+    height: {
+      get: function () {
+        return this.layout.options.partHeight;
+      }
+    },
+
+    /**
+     * The x position of the cell in parent timewise measure.
+     * - Set the x value will cause the cell element translate.
+     * @type {number}
+     */
+    x: {
+      get: function () {
+        return this._x;
+      },
+      set: function (x) {
+        this._x = x;
+        this.el.transform(Snap.matrix().translate(x, this.y2));
+      }
+    },
+
+    /**
+     * The y2 position of the cell in parent timewise measure.
+     * - Set the y2 value will cause the cell element translate.
+     * @type {number}
+     */
+    y2: {
+      get: function () {
+        var
+          lo = this.layout.options,
+          p = this._pIndex;
+
+        return p ? (p + 1) * lo.partHeight + p * lo.partSep : lo.partHeight;
+      }
+    },
+
+    /**
+     * The left bar of this cell.
+     * - barLeft at first measure of a system:
+     * ```
+     * |]  -> |
+     * :|  -> |
+     * :|: -> |:
+     * ```
+     * @type {musje.Bar}
+     * @readonly
+     */
+    barLeftInSystem: {
+      get: function () {
+        var bar = this.barLeft;
+        if (!bar) { return { width: 0, height: 0 }; }
+
+        // First measure in the system.
+        if (this.measure.inSystemBegin) {
+          if (bar.value === 'end' || bar.value === 'repeat-end') {
+            bar = new musje.Bar('single');
+          } else if (bar.value === 'repeat-both') {
+            bar = new musje.Bar('repeat-begin');
+          }
+        }
+        bar.def = this.layout.defs.get(bar);
+        return bar;
+      }
+    },
+
+    /**
+     * The right bar of this cell.
+     * - barRight at last measure of a system:
+     * ```
+     *  |: ->  |
+     * :|: -> :|
+     * ```
+     * @type {musje.Bar}
+     * @readonly
+     */
+    barRightInSystem: {
+      get: function () {
+        var
+          bar = this.barRight,
+          system = this.measure.system;
+
+        if (!bar) { return { width: 0, height: 0 }; }
+
+        // Last measure in the system.
+        if (system && this.measure.inSystemEnd) {
+          if (bar.value === 'repeat-begin') {
+            bar = new musje.Bar('single');
+          } else if (bar.value === 'repeat-both') {
+            bar = new musje.Bar('repeat-end');
+          }
+        }
+        bar.def = this.layout.defs.get(bar);
+        return bar;
+      }
+    },
+
+    /**
+     * Reflow the cell.
+     * @protected
+     */
+    _reflow: function () {
+      var cell = this;
+      this.data.forEach(function (data) {
+        data.x *= cell.width / cell.minWidth;
+      });
+    },
+
+    /**
+     * Flow the cell.
+     */
+    flow: function () {
+      var
+        defs = this.layout.defs,
+        lo = this.layout.options,
+        x = 0,
+        minHeight;
+
+      this.data.forEach(function (data) {
+        var def = data.def = defs.get(data);
+        data.x = x;
+        data.y = 0;
+        x += def.width + lo.musicDataSep;
+        minHeight = Math.min(minHeight, def.height);
+      });
+
+      this.minWidth = x;
+      this.minHeight = minHeight;
+    },
+
+    /**
+     * Draw box of the cell.
+     * @return {Element} The box SVG rect element.
+     */
+    drawBox: function () {
+      this._boxEl = this.el.rect(0, -this.height, this.width, this.height)
+                           .addClass('bbox');
+      return this._boxEl;
+    },
+
+    /**
+     * Clear the box SVG element.
+     */
+    clearBox: function () {
+      this._boxEl.remove();
+      this._boxEl = undefined;
+    }
+  };
+
+  musje.defineProperties(musje.Cell.prototype, musje.LayoutCell);
+
+}(musje, Snap));
+
+/* global musje */
+
+(function (musje) {
+  'use strict';
+
+  /**
+   * Layout mixin for the music data
+   * @mixin
+   */
+  musje.LayoutMusicData =
+  /** @lends musje.LayoutMusicData# */
+  {
+    /**
+     * The x position of the music data in the cell.
+     * @type {number}
+     */
+    x: {
+      get: function () {
+        return this._x;
+      },
+      set: function (x) {
+        this._x = x;
+        if (this.el) {
+          this.el.attr('x', x);
+        }
+      }
+    },
+
+    /**
+     * The y position of the music data in the cell.
+     * @type {number}
+     */
+    y: {
+      get: function () {
+        return this._y;
+      },
+      set: function (y) {
+        this._y = y;
+        if (this.el) { this.el.attr('y', y); }
+      }
+    },
+
+    /**
+     * The x position of the music data in the system.
+     * @type {number}
+     */
+    systemX: {
+      get: function () {
+        return this.x + this.cell.x + this.cell.measure.x;
+      }
+    },
+
+    /**
+     * The width of the music data.
+     * @type {number}
+     * @readonly
+     */
+    width: {
+      get: function () {
+        return this.def.width;
+      }
+    }
+  };
+
+  ['Time', 'Bar', 'Note', 'Rest', 'Chord', 'Voice'].forEach(function (className) {
+    musje.defineProperties(musje[className].prototype, musje.LayoutMusicData);
+  });
+
+}(musje));
+
+/* global musje, Snap */
+
+(function (musje, Snap) {
+  'use strict';
+
+  /**
+   * [Renderer description]
+   * @class
+   * @alias musje.Renderer
+   * @param svg {string}
+   * @param lo {Object}
+   */
+  var Renderer = musje.Renderer = function (svg, lo) {
+    this._lo = musje.extend(musje.Layout.options, lo);
+    this.layout = new musje.Layout(svg, this._lo);
+  };
+
+  musje.defineProperties(musje.Renderer.prototype,
+  /** @lends musje.Renderer# */
+  {
+    render: function (score) {
+      this._score = score;
+      this.layout.flow(score);
+
+      this.renderHeader();
+      this.renderContent();
+    },
+
+    renderHeader: function () {
+
+      var
+        lo = this._lo,
+        header = this.layout.header,
+        el = header.el,
+        width = lo.width;
+
+      el.text(width / 2, lo.titleFontSize, this._score.head.title)
+        .attr({
+          fontSize: lo.titleFontSize,
+          fontWeight: lo.titleFontWeight,
+          textAnchor: 'middle'
+        });
+      el.text(0, lo.titleFontSize, this._score.head.key)
+        .attr({
+          fontSize: lo.titleFontSize,
+          fontWeight: 'normal',
+          textAnchor: 'start'
+        });
+      el.text(width, lo.titleFontSize * 1.5, this._score.head.composer)
+        .attr({
+          fontSize: lo.composerFontSize,
+          fontWeight: lo.composerFontWeight,
+          textAnchor: 'end'
+        });
+
+      header.height = el.getBBox().height;
+    },
+
+    renderContent: function () {
+      var lo = this._lo;
+
+      this.layout.content.systems.forEach(function (system) {
+        var measures = system.measures;
+        measures.forEach(function (measure) {
+          Renderer.renderBar(measure, lo);
+          measure.parts.forEach(function (cell) {
+            Renderer.renderCell(cell, lo);
+          });
+        });
+      });
+    }
+
+  });
+
+  function renderNote(note, cell, lo) {
+    note.el = cell.el.g().transform(Snap.matrix()
+                                .translate(note.x, note.y));
+    note.el.use(note.def.pitchDef.el);
+    Renderer.renderDuration(note, lo);
+  }
+
+  /**
+   * Render cell
+   * @param  {musje.Cell} cell The cell
+   * @param  {Object} lo   Layout options
+   */
+  musje.Renderer.renderCell = function (cell, lo) {
+    cell.data.forEach(function (data) {
+      switch (data.$type) {
+      case 'Rest':
+        renderNote(data, cell, lo);
+        break;
+      case 'Note':
+        renderNote(data, cell, lo);
+        Renderer.renderTie(data);
+        Renderer.renderSlur(data);
+        break;
+      case 'Time':
+        data.el = cell.el.use(data.def.el).attr({
+          x: data.x, y: data.y
+        });
+        break;
+      }
+    });
+  };
+
+  /**
+   * Render the score in jianpu (numbered musical notation).
+   * @member
+   * @function
+   * @param {string} svg
+   * @param {Object} lo - Layout options.
+   */
+  musje.Score.prototype.render = function (svg, lo) {
+    new Renderer(svg, lo).render(this);
+  };
+
+}(musje, Snap));
+
+/* global musje, Snap */
+
+(function (musje, Snap) {
+  'use strict';
+
+  function renderDots(el, x, radius, measureHeight) {
+    var
+      cy = measureHeight / 2,
+      dy = measureHeight * 0.15;
+
+    el.circle(x, cy - dy, radius);
+    el.circle(x, cy + dy, radius);
+  }
+
+  function render(bar, measure, lo) {
+    var el = measure.el.g().addClass('mus-barline');
+
+    el.use(bar.def.el).transform(Snap.matrix().scale(1, measure.height));
+
+    switch (bar.value) {
+    case 'repeat-begin':
+      renderDots(el, bar.width - lo.barlineDotRadius, lo.barlineDotRadius, measure.height);
+      break;
+    case 'repeat-end':
+      renderDots(el, lo.barlineDotRadius, lo.barlineDotRadius, measure.height);
+      break;
+    case 'repeat-both':
+      renderDots(el, bar.width - lo.barlineDotRadius, lo.barlineDotRadius, measure.height);
+      renderDots(el, lo.barlineDotRadius, lo.barlineDotRadius, measure.height);
+      break;
+    }
+
+    return el;
+  }
+
+  function translate(el, x) {
+    el.transform(Snap.matrix().translate(x, 0));
+  }
+
+  // @param m {number} Measure index in measures.
+  // @param len {number} Length of measures.
+  musje.Renderer.renderBar = function (measure, lo) {
+    var
+      bar = measure.barRightInSystem,
+      el;
+
+    if (bar.def) {
+      el = render(bar, measure, lo);
+
+      // Align end in system end.
+      if (measure.inSystemEnd) {
+        translate(el, measure.width - bar.width);
+
+      // Others align middle.
+      } else {
+        translate(el, measure.width - bar.width / 2);
+      }
+    }
+
+    // Render right bar and align begin in system begin.
+    if (measure.inSystemBegin) {
+      bar = measure.barLeftInSystem;
+      if (bar.def) {
+        render(bar, measure, lo);
+      }
+    }
+  };
+
+}(musje, Snap));
+
+/* global musje, Snap */
+
+(function (Renderer, Snap) {
+  'use strict';
+
+  function renderUnderbar(note1, note2, y, lo) {
+    note1.el.line(0, y, note2.x - note1.x + note2.width, y)
+           .attr('stroke-width', lo.typeStrokeWidth);
+  }
+
+  Renderer.renderDuration = function (note, lo) {
+    var durationDef = note.def.durationDef;
+    var pitchDef = note.def.pitchDef;
+
+    var underbar = note.duration.underbar;
+ var y = 0.5 * lo.underbarSep;;
+
+    // Whole and half notes
+    if (note.duration.type < 4) {
+      note.el.use(durationDef.el).attr({
+        x: pitchDef.width,
+        y: pitchDef.stepCy
+      });
+
+    // Quarter or shorter notes
+    } else {
+
+      // Add dots
+      if (note.duration.dot) {
+        note.el.g().transform(Snap.matrix().translate(pitchDef.width, 0))
+          .use(durationDef.el).transform(pitchDef.matrix);
+      }
+
+      // Add underbars for eigth or shorter notes
+      if (underbar) {
+        for (var i = 0; i < underbar; i++) {
+
+          // Only render beam for the begin one.
+          if (note.beams[i]) {
+            if (note.beams[i].value === 'begin') {
+              renderUnderbar(note, note.beams[i].endDurable, y, lo);
+            }
+ 
+          // Unbeamed underbar
+          } else {
+            renderUnderbar(note, note, y, lo);
+          }
+          y += lo.underbarSep;
+        }
+      }
+    }
+  };
+
+}(musje.Renderer, Snap));
+
+/* global musje, Snap */
+
+(function (musje, Snap) {
+  'use strict';
+
+  function getCurvePath(x1, y1, x2, y2) {
+    var
+      dx = x2 - x1,
+      dy = y2 - y1,
+      c1x = 0,//-0.1 * dx,
+      c1y = 0,//-0.1 * dy,
+      c2x = dx,//1.1 * dx,
+      c2y = dy;//1.1 * dy;
+
+    return Snap.format('M{x1},{y1}c{c1x},{c1y} {c2x},{c2y} {dx},{dy}c{c3x},{c3y} {c4x},{c4y} {negDx},{negDy}', {
+      x1: x1,
+      y1: y1,
+      c1x: c1x,
+      c1y: c1y - 8,
+      c2x: c2x,
+      c2y: c2y - 8,
+      dx: dx,
+      dy: dy,
+      c3x: -c1x,
+      c3y: -c1y - 10,
+      c4x: -c2x,
+      c4y: -c2y - 10,
+      negDx: -dx,
+      negDy: -dy
+    });
+  }
+
+  function renderEndCurve(note, error) {
+    var
+      x1 = note.def.pitchDef.stepCx,
+      y1 = note.def.pitchDef.stepTop,
+      x2 = - note.systemX - 3,
+      el = note.el.path(getCurvePath(x1, y1, x2, y1 - 3));
+
+    if (error) { el.addClass('mus-error'); }
+    return el;
+  }
+
+ function renderBeginCurve(note, error) {
+    var
+      x1 = note.def.pitchDef.stepCx,
+      y1 = note.def.pitchDef.stepTop,
+      x2 = note.system.width - note.systemX + 3,
+      el = note.el.path(getCurvePath(x1, y1, x2, y1 - 3));
+
+    if (error) { el.addClass('mus-error'); }
+    return el;
+  }
+
+ function renderCompleteCurve(note1, note2, error) {
+    var
+      x1 = note1.def.pitchDef.stepCx,
+      y1 = note1.def.pitchDef.stepTop,
+      x2 = note2.def.pitchDef.stepCx,
+      y2 = note2.def.pitchDef.stepTop,
+      noteDx = note2.systemX - note1.systemX,
+      el = note1.el.path(getCurvePath(x1, y1, noteDx + x2, y2));
+
+    if (error) { el.addClass('mus-error'); }
+    return el;
+  }
+
+  function renderCurve(type, note) {
+    var next, prev, prevHasError, nextHasError;
+
+    if (note[type].end) {
+      prev = note[type].prevParent;
+      prevHasError = note[type].prevHasError;
+
+      if (!prev || prev.system !== note.system) {
+        renderEndCurve(note, prevHasError);
+      } else if (prevHasError) {
+        renderCompleteCurve(note, prev, prevHasError);
+      }
+    }
+
+    if (note[type].begin) {
+      next = note[type].nextParent;
+      nextHasError = note[type].nextHasError;
+
+      if (!next || next.system !== note.system) {
+        renderBeginCurve(note, nextHasError);
+      } else {
+        renderCompleteCurve(note, next, nextHasError);
+      }
+    }
+  }
+
+  /**
+   * Render tie.
+   * @param  {musje.Note} note
+   */
+  musje.Renderer.renderTie = function (note) {
+    renderCurve('tie', note);
+  };
+
+  /**
+   * Render slur.
+   * @param  {musje.Note} note
+   */
+  musje.Renderer.renderSlur = function (note) {
+    renderCurve('slur', note);
+  };
+
+}(musje, Snap));
+
+/* global musje, MIDI */
+
+(function (musje, MIDI) {
+  'use strict';
+
+  if (!musje.Score) { return; }
+
+  // if (window.AudioContext) {
+  //   var audioCtx = new window.AudioContext();
+  //   var gainNode = audioCtx.createGain();
+  //   gainNode.connect(audioCtx.destination);
+  //   gainNode.gain.value = 0.5;  // set the volume
+  // }
+
+  // // var oscillator = audioCtx.createOscillator();
+  // // oscillator.connect(gainNode);
+  // // oscillator.type = 'square'; // sine | square | sawtooth | triangle | custom
+
+  // function playNote(time, dur, freq) {
+  //   if (!audioCtx) { return; }
+
+  //   var oscillator = audioCtx.createOscillator();
+  //   oscillator.type = 'sine';
+  //   oscillator.connect(audioCtx.destination);
+  //   oscillator.frequency.value = freq;
+  //   oscillator.start(time);
+  //   oscillator.stop(time + dur - 0.05);
+  // }
+
+  function midiPlayNote(note, time) {
+    var
+      midiNumber = note.pitch.midiNumber,
+      dur = note.duration.second;
+
+    function play() {
+      if (!note.tie.prevParent || note.tie.prevHasError) {
+        MIDI.noteOn(0, midiNumber, 100, 0);
+      }
+      if (!note.tie.nextParent || note.tie.nextHasError) {
+        MIDI.noteOff(0, midiNumber, dur);
+      }
+
+      note.el.addClass('mus-playing');
+
+      setTimeout(function () {
+        note.el.removeClass('mus-playing');
+      }, dur * 800 + 100);
+
+      console.log('Play: ' + note, time, dur, midiNumber);
+    }
+
+    return setTimeout(play, time * 800);
+  }
+
+  var timeouts = [];
+
+  /**
+   * Start playing the song.
+   * @member
+   * @function
+   */
+  musje.Score.prototype.play = function() {
+    var
+      measures = this.parts[0].measures,
+      time = 0; //audioCtx.currentTime
+
+    measures.forEach(function (cell) {
+      cell.data.forEach(function (data) {
+        switch (data.$type) {
+        case 'Note':
+          // playNote(time, dur, freq);
+          timeouts.push(midiPlayNote(data, time));
+          time += data.duration.second;
+          break;
+        case 'Rest':
+          time += data.duration.second;
+          break;
+        }
+      });
+    });
+  };
+
+  /**
+   * Stop playing the song.
+   * @member
+   * @function
+   */
+  musje.Score.prototype.stop = function () {
+    timeouts.forEach(function (timeout) {
+      clearTimeout(timeout);
+    });
+    timeouts = [];
+  };
+
+
+  var colorouts = [];
+  /**
+   * light on the note
+   * @noteIndex
+   */
+   musje.Score.prototype.lightOn = function (index) {
+    if (colorouts.length == 0) {
+      var
+      measures = this.parts[0].measures;
+
+      measures.forEach(function (cell) {
+      cell.data.forEach(function (data) {
+        switch (data.$type) {
+        case 'Note':
+          // playNote(time, dur, freq);
+          colorouts.push(data);
+          break;
+        case 'Rest':
+          
+          break;
+        }
+      });
+    });  
+    };
+    
+    //note at index
+    var note = colorouts[index];
+    note.el.addClass('mus-playing');
+   };
+
+   /**
+   * light off the note
+   * @noteIndex
+   */
+   musje.Score.prototype.lightOff = function (index) {
+    if (colorouts.length == 0) {
+      var
+      measures = this.parts[0].measures;
+
+      measures.forEach(function (cell) {
+      cell.data.forEach(function (data) {
+        switch (data.$type) {
+        case 'Note':
+          // playNote(time, dur, freq);
+          colorouts.push(data);
+          break;
+        case 'Rest':
+          
+          break;
+        }
+      });
+    });  
+    };
+    
+    //note at index
+    var note = colorouts[index];
+ note.el.removeClass('mus-playing');
+ note.el.removeClass('mus-blue');
+ note.el.removeClass('mus-red');
+ note.el.removeClass('mus-green');
+ note.el.removeClass('mus-cyan');
+ note.el.removeClass('mus-purple');
+ note.el.removeClass('mus-black');
+   };
+ 
+    musje.Score.prototype.colorNote = function (index, colorStr) {
+        if (colorouts.length == 0) {
+            var
+            measures = this.parts[0].measures;
+ 
+            measures.forEach(function (cell) {
+            cell.data.forEach(function (data) {
+                                    switch (data.$type) {
+                                    case 'Note':
+                                    // playNote(time, dur, freq);
+                                    colorouts.push(data);
+                                    break;
+                                    case 'Rest':
+                                    
+                                    break;
+                                    }
+                                    });
+                  });  
+        };
+ //note at index
+    var note = colorouts[index];
+    if (colorStr == '#000000') {
+        note.el.addClass('mus-black');
+ } else if (colorStr == '#00ffff') {
+    note.el.addClass('mus-blue');
+ }  else if (colorStr == '#5ee639') {
+    note.el.addClass('mus-green');
+ } else if (colorStr == '#ff3737') {
+ note.el.addClass('mus-red');
+ } else if (colorStr == '#db32ff') {
+ note.el.addClass('mus-purple');
+ } else if (colorStr == '#23a4ff') {
+ note.el.addClass('mus-cyan');
+ } else {
+    note.el.removeClass('mus-playing');
+ }
+    }
+ 
+ 
+    musje.Score.prototype.clearColorOuts = function () {
+        colorouts.length = 0;
+    }
+     /**
+   * scroll to the note
+   * @noteIndex
+   */
+   musje.Score.prototype.scrollTo = function (index, height) {
+    if (colorouts.length == 0) {
+      var
+      measures = this.parts[0].measures;
+ 
+      measures.forEach(function (cell) {
+      cell.data.forEach(function (data) {
+        switch (data.$type) {
+        case 'Note':
+          // playNote(time, dur, freq);
+          colorouts.push(data);
+          break;
+        case 'Rest':
+          
+          break;
+        }
+                        
+      });
+                      
+    });  
+    };
+    //note at index
+    var note = colorouts[index];
+    var currentY = document.body.scrollTop + document.body.clientHeight;
+    var blockBottom = parseFloat(note.el.parent().parent().parent().matrix.offset()[1]) + 180;
+    var blockTop = 0;
+ 
+    if (blockBottom < height) {
+        document.body.scrollTop = blockTop;
+    } else {
+        document.body.scrollTop = blockBottom - height;
+    }
+ }
+}(musje, MIDI));
+
+//# sourceMappingURL=.tmp/musje.js.map

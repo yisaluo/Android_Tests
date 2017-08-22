@@ -429,7 +429,7 @@ public class MusicXMLNote {
                     private Object tuplet;
                     private int stem_direction;
                     private Object beam;
-                    private Object tie;
+                    private String tie;
                     private Object slur;
                     private Object lyric;
                     private int tag;
@@ -495,11 +495,11 @@ public class MusicXMLNote {
                         this.beam = beam;
                     }
 
-                    public Object getTie() {
+                    public String getTie() {
                         return tie;
                     }
 
-                    public void setTie(Object tie) {
+                    public void setTie(String tie) {
                         this.tie = tie;
                     }
 

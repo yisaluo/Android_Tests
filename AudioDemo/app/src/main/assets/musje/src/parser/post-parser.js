@@ -1,0 +1,2 @@
+  musje.parser = parser;
+}(musje));

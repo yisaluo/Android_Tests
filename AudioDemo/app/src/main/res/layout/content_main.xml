@@ -14,137 +14,152 @@
     tools:showIn="@layout/activity_main">
 
     <TextView
+        android:id="@+id/note_name"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Hello World!"
-        android:id="@+id/note_name"
-        android:layout_below="@+id/note_pitch"
         android:layout_alignParentLeft="true"
         android:layout_alignParentStart="true"
-        android:layout_marginTop="10dp"/>
+        android:layout_below="@+id/note_pitch"
+        android:layout_marginTop="10dp"
+        android:text="Hello World!" />
 
     <TextView
+        android:id="@+id/note_pitch"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Hello World!"
-        android:id="@+id/note_pitch"
-        android:layout_alignParentTop="true"
         android:layout_alignParentLeft="true"
-        android:layout_alignParentStart="true" />
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:text="Hello World!" />
 
     <TextView
         android:id="@+id/time"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_below="@id/note_name"
-        android:text="time"
-        android:layout_marginTop="10dp"/>
+        android:layout_marginTop="10dp"
+        android:text="time" />
 
     <TextView
         android:id="@+id/target"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_below="@id/time"
-        android:text="请弹这个音："
-        android:layout_marginTop="10dp"/>
+        android:layout_marginTop="10dp"
+        android:text="请弹这个音：" />
 
     <Button
-        android:text="开始"
+        android:id="@+id/button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:id="@+id/button"
-        android:layout_marginTop="17dp"
-        android:layout_below="@+id/target"
         android:layout_alignParentLeft="true"
         android:layout_alignParentStart="true"
-        android:onClick="clear"/>
+        android:layout_below="@+id/target"
+        android:layout_marginTop="17dp"
+        android:onClick="clear"
+        android:text="开始" />
 
     <Button
-        android:text="停止"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
         android:id="@+id/button1"
-        android:layout_toRightOf="@+id/button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_alignTop="@id/button"
-        android:onClick="caculate"/>
+        android:layout_toRightOf="@+id/button"
+        android:onClick="caculate"
+        android:text="停止" />
 
     <Button
-        android:text="校对中央C"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
         android:id="@+id/button2"
-        android:onClick="onCheckTone"
-        android:layout_alignParentRight="true"
-        android:layout_alignParentEnd="true" />
-
-    <Button
-        android:text="复位"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:id="@+id/button3"
-        android:onClick="onResetTone"
-        android:layout_marginTop="21dp"
-        android:layout_below="@+id/button4"
+        android:layout_alignParentEnd="true"
         android:layout_alignParentRight="true"
-        android:layout_alignParentEnd="true" />
+        android:onClick="onCheckTone"
+        android:text="校对中央C" />
+
+    <Button
+        android:id="@+id/button3"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentRight="true"
+        android:layout_below="@+id/button4"
+        android:layout_marginTop="21dp"
+        android:onClick="onResetTone"
+        android:text="复位" />
 
     <TextView
-        android:text="实时音量："
+        android:id="@+id/textview_volume"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
         android:layout_alignParentLeft="true"
         android:layout_alignParentStart="true"
-        android:id="@+id/textview_volume" />
+        android:text="实时音量：" />
 
     <TextView
-        android:text="请在比较安静的环境下使用"
+        android:id="@+id/textView4"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_above="@+id/textview_volume"
         android:layout_alignParentLeft="true"
         android:layout_alignParentStart="true"
-        android:layout_marginBottom="36dp"
-        android:id="@+id/textView2"
-        android:textSize="24sp"
-        android:textColor="#ff0000"/>
-
-    <TextView
-        android:text="歌曲：小星星    速度：60"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_above="@+id/textView2"
-        android:layout_alignParentLeft="true"
-        android:layout_alignParentStart="true"
-        android:layout_marginBottom="21dp"
-        android:id="@+id/textView3" />
-
-    <TextView
-        android:text="音符提示"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
         android:layout_below="@+id/button"
-        android:layout_alignParentLeft="true"
-        android:layout_alignParentStart="true"
-        android:id="@+id/textView4" />
+        android:text="音符提示" />
 
     <Button
-        android:text="完成校对"
+        android:id="@+id/button4"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:id="@+id/button4"
-        android:onClick="onFinishCheckTone"
-        android:layout_alignParentRight="true"
         android:layout_alignParentEnd="true"
-        android:layout_below="@id/button2"/>
+        android:layout_alignParentRight="true"
+        android:layout_below="@id/button2"
+        android:onClick="onFinishCheckTone"
+        android:text="完成校对" />
 
-    <GridLayout
-        android:id="@+id/notes_layout"
-        android:orientation="horizontal"
+    <ScrollView
         android:layout_width="match_parent"
         android:layout_height="200dp"
-        android:columnCount="10"
-        android:layout_below="@+id/textView4"
         android:layout_alignParentLeft="true"
-        android:layout_alignParentStart="true"></GridLayout>
+        android:layout_alignParentStart="true"
+        android:layout_below="@+id/textView4">
+
+        <GridLayout
+            android:id="@+id/notes_layout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:columnCount="10"
+            android:orientation="horizontal">
+
+        </GridLayout>
+    </ScrollView>
+
+
+    <WebView
+        android:id="@+id/stave_webview"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:layout_below="@+id/textView4"
+        android:background="@android:color/transparent"
+        android:visibility="gone">
+
+    </WebView>
+
+    <TextView
+        android:id="@+id/textView2"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="37dp"
+        android:text="请在比较安静的环境下使用"
+        android:textColor="#ff0000"
+        android:textSize="24sp"
+        android:layout_above="@+id/textview_volume"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true" />
+
+    <TextView
+        android:id="@+id/tempo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="节拍："
+        android:layout_above="@id/textView2"/>
 </RelativeLayout>
