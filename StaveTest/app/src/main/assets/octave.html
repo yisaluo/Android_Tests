@@ -1,0 +1,113 @@
+<html>
+  <head>
+    <title>VexFlow MusicXML Viewer</title>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="initial-scale = 1.0, minimum-scale = 1.0, maximum-scale = 1.0, user-scalable = no">
+
+    <!-- Compiled Sources (may need to be copied to same directory) -->
+    <script src="jquery.js"></script>
+    <script src="vexflow-min.js"></script>
+
+    <script>
+    function getValue(varname)
+{
+  var url = window.location.href;
+  var qparts = url.split("?");
+  if (qparts.length == 0){return "";}
+  var query = qparts[1];
+  var vars = query.split("&amp;");
+  var value = "";
+  for (i=0; i<vars.length; i++)
+  {
+    var parts = vars[i].split("=");
+    if (parts[0] == varname)
+    {
+      value = parts[1];
+      break;
+    }
+  }
+  value = unescape(value);
+  value.replace(/\+/g," ");
+  return value;
+}   
+
+      // source: http://stackoverflow.com/a/901144
+      function getParameter(name) {
+        name = name.replace(/\[]/, "\\\[").replace(/[\]]/, "\\\]");
+        var regex = new RegExp("[\\?&]" + name + "=([^&#]*)");
+        var results = regex.exec(window.location.search);
+        if (results == null) return undefined;
+        else return decodeURIComponent(results[1].replace(/\+/g, " "));
+      }
+
+      var doc = null;
+      var formatter = null;
+
+
+    </script>
+    <style>    
+    #background {
+        background: url("bg_webview_ipad.png") repeat;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -1;
+    }
+
+      #viewer {
+        width: 100%;
+        overflow: hidden;
+        background:transparent;
+      }
+    </style>
+  </head>
+  <body style="background-color: transparent">
+
+<!--    <div id="background"></div>-->
+<!--  <div class="vex">-->
+<!--    <p>测试文件</p>-->
+<!--  </div>-->
+    <div id="text"></div>
+    <div id="res1"></div>
+    <div id="res2"></div>
+    <div id="res3"></div>
+    <div id="res4"></div>
+    <div id="viewer">
+<!--        请使用火狐或者Safari浏览器-->
+    </div>
+    
+    <script type="text/javascript">
+          $(document).ready(function() {
+        var req = new XMLHttpRequest();
+        var uri = getParameter('doc');
+
+        // if (! uri) uri = getValue('filename');
+        uri = getValue('filename');
+
+        req.open('GET', uri, true);
+        // document.getElementById("text").innerHTML=uri;
+        req.onreadystatechange = function() {
+          // document.getElementById("res1").innerHTML=req.readyState;
+          // document.getElementById("res2").innerHTML=req.status;
+
+          if (req.readyState != 4){
+            return;
+          }
+
+            // document.getElementById("res3").innerHTML=req.responseText;
+            doc = new Vex.Flow.Document(req.responseText);
+            formatter = doc.getFormatter();
+            formatter.draw($("#viewer")[0]);
+
+            // document.getElementById("res4").innerHTML="done";
+        };
+
+        req.send(null);
+
+      });
+
+    </script>
+  </body>
+</html>
