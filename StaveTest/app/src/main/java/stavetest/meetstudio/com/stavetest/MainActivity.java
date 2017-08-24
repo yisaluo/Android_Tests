@@ -27,7 +27,7 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.zip.Inflater;
 
-public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLoaderListener, View.OnClickListener, AudioProcess.OnFreqChangedListener {
+public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLoaderListener, View.OnClickListener, AudioProcess.OnFreqChangedListener, MAudioDispatcher.OnByteReadListener {
 
     private String testData = "";
 
@@ -74,6 +74,40 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
                 view.cover.setVisibility(View.GONE);
                 view.controlLayout.setVisibility(View.VISIBLE);
             }
+
+            // Button click listener
+            Button instrumentButton = (Button)view.findViewById(R.id.standard_instrument);
+            Button voiceButton = (Button)view.findViewById(R.id.standard_voice);
+            Button scoreAndReplayButton = (Button)view.findViewById(R.id.standard_stop_and_score);
+            Button recordButton = (Button) view.findViewById(R.id.record);
+
+            instrumentButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    onInstrumentButton(view);
+                }
+            });
+
+            voiceButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    onVoiceButton(view);
+                }
+            });
+
+            scoreAndReplayButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    onScoreAndReplayButton(view);
+                }
+            });
+
+            recordButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    onRecordButton(view);
+                }
+            });
         }
 
 
@@ -150,7 +184,7 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
      * 开始音频识别
      */
     private void startShiyin() {
-        audioProcess = new AudioProcess();
+        audioProcess = new AudioProcess(this);
         audioProcess.setOnFreqChangedListener(this);
         audioProcess.start();
     }
@@ -167,7 +201,7 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
 
     @Override
     public void onNoteLoaded(NoteLoader loader, String notes) {
-        Log.i("onNoteLoaded", "onNoteLoaded result=" + notes);
+        // Log.i("onNoteLoaded", "onNoteLoaded result=" + notes);
     }
 
     @Override
@@ -183,6 +217,12 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
     @Override
     public void onFreqChanged(float freq) {
         Log.i("onFreqChanged", "freq = " + freq);
+    }
+
+    @Override
+    public void onByteRead(int length, byte[] audioByteBuffer) {
+        // 读取到字节数据，保存到录音文件中
+        RecordFileManager.getInstance(this).writeRecordFileData(audioByteBuffer);
     }
 
     public class TrainingHolder {
@@ -234,7 +274,7 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
                 holder.instrumentButton = (Button) convertView.findViewById(R.id.standard_instrument);
                 holder.voiceButton = (Button) convertView.findViewById(R.id.standard_voice);
                 holder.recordButton = (Button) convertView.findViewById(R.id.standard_stop_and_score);
-                holder.stopAndScoreButton = (Button) convertView.findViewById(R.id.standard_record);
+                holder.stopAndScoreButton = (Button) convertView.findViewById(R.id.record);
                 holder.controlLayout = (RelativeLayout) convertView.findViewById(R.id.control_buttons);
 
                 holder.webView.getSettings().setJavaScriptEnabled(true);
@@ -259,5 +299,50 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
 
             return convertView;
         }
+    }
+
+    // 按钮事件
+
+    /**
+     * 乐器示范
+     * @param view
+     */
+    public void onInstrumentButton(View view) {
+
+    }
+
+    /**
+     * 人声示范
+     * @param view
+     */
+    public void onVoiceButton(View view) {
+
+    }
+
+    /**
+     * 分数、回放
+     * @param view
+     */
+    public void onScoreAndReplayButton(View view) {
+        if (RecordFileManager.getInstance(this).isPlaying) {
+            RecordFileManager.getInstance(this).stopPlayRecordFile();
+        } else {
+            RecordFileManager.getInstance(this).playRecordFile();
+        }
+    }
+
+    /**
+     * 录音按钮
+     * @param view
+     */
+    public void onRecordButton(View view) {
+        Log.i("onRecordButton", "onRecordButton");
+        if (RecordFileManager.getInstance(this).isRecording) {
+            RecordFileManager.getInstance(this).finishWriteRecordFileData();
+        } else {
+            String fileName = String.format("slice_%d", sliceIndex);
+            RecordFileManager.getInstance(this).prepareRecordFile(fileName);
+        }
+
     }
 }

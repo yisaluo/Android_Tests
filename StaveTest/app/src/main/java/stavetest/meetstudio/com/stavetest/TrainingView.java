@@ -44,7 +44,7 @@ public class TrainingView extends RelativeLayout {
         instrumentButton = (Button) this.findViewById(R.id.standard_instrument);
         voiceButton = (Button) this.findViewById(R.id.standard_voice);
         recordButton = (Button) this.findViewById(R.id.standard_stop_and_score);
-        stopAndScoreButton = (Button) this.findViewById(R.id.standard_record);
+        stopAndScoreButton = (Button) this.findViewById(R.id.record);
         staveLayout = (RelativeLayout) this.findViewById(R.id.layout_stave);
         controlLayout = (RelativeLayout) this.findViewById(R.id.control_buttons);
         cover = this.findViewById(R.id.cover);
