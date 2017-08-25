@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -21,13 +22,18 @@ import android.widget.RelativeLayout;
 import android.widget.ScrollView;
 import android.widget.Toast;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.zip.Inflater;
 
-public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLoaderListener, View.OnClickListener, AudioProcess.OnFreqChangedListener, MAudioDispatcher.OnByteReadListener {
+public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLoaderListener, View.OnClickListener, AudioProcess.OnFreqChangedListener, MAudioDispatcher.OnByteReadListener, MyTimer.MyTimerListener {
 
     private String testData = "";
 
@@ -40,6 +46,28 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
     private AudioProcess audioProcess;
 
     private int RECORD_AUDIO_PERMISSION_REQUEST_CODE = 1;
+
+    private ArrayList<MusicXMLNoteParser.Note> notesArray = new ArrayList();
+
+    private MyTimer myTimer;
+
+    @Override
+    public void onTimerUpdated(float totalTime, float dt) {
+
+    }
+
+    @Override
+    public void onTimerMax() {
+        this.onRecordButton(null);
+    }
+
+    private class PitchData {
+        public float pitch;
+        public float time;
+        public int note;
+    }
+
+    private ArrayList<PitchData> pitchDatas = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -113,7 +141,7 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
 
         NoteLoader noteLoader = new NoteLoader(this);
         noteLoader.listener = this;
-        noteLoader.loadStave("training_test.xml");
+        noteLoader.loadStave("training_7.xml");
 
         // 检查权限
         if (ContextCompat.checkSelfPermission(this,
@@ -123,6 +151,8 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO},
                     RECORD_AUDIO_PERMISSION_REQUEST_CODE);
         }
+
+        myTimer = new MyTimer(this, this);
     }
 
     @Override
@@ -200,8 +230,18 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
     }
 
     @Override
-    public void onNoteLoaded(NoteLoader loader, String notes) {
-        // Log.i("onNoteLoaded", "onNoteLoaded result=" + notes);
+    public void onNoteLoaded(NoteLoader loader, String notesStr) {
+        Log.i("onNoteLoaded", "onNoteLoaded result=" + notesStr);
+        // 解析曲谱数据
+        notesArray.clear();
+        pitchDatas.clear();
+        notesArray = MusicXMLNoteParser.getInstance().parseJsonData(notesStr);
+        Log.i("onNoteLoaded", "notesArray.size() = " + notesArray.size());
+
+        float duration = MusicXMLNoteParser.getInstance().getTotalDuration();
+        Log.i("onNoteLoaded", "duration = " + duration);
+
+        myTimer.setMaxTime(duration);
     }
 
     @Override
@@ -216,7 +256,25 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
 
     @Override
     public void onFreqChanged(float freq) {
-        Log.i("onFreqChanged", "freq = " + freq);
+        // Log.i("onFreqChanged", "freq = " + freq);
+        if (RecordFileManager.getInstance(this).isRecording) {
+            String noteNames = NoteMap.caculateNoteName(freq);
+            String[] notesNameArray = noteNames.split(",");
+            String noteName = TextUtils.isEmpty(noteNames) ? "" : notesNameArray[0];
+            Log.i("onFreqChanged", "noteName = " + noteName);
+            int note = 0;
+            if (!TextUtils.isEmpty(noteName)) {
+                note = NoteConverter.toneFromKey(noteName, noteName.substring(1, 2));
+            }
+
+            // 录音状态时，进行应该检测对比
+            PitchData data = new PitchData();
+            data.time = myTimer.getCurrentTickTimer();
+            data.pitch = freq;
+            data.note = note;
+
+            pitchDatas.add(data);
+        }
     }
 
     @Override
@@ -339,10 +397,42 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
         Log.i("onRecordButton", "onRecordButton");
         if (RecordFileManager.getInstance(this).isRecording) {
             RecordFileManager.getInstance(this).finishWriteRecordFileData();
+
+            myTimer.stopTimer();
+
+            // 评分
+            caculateScore();
         } else {
             String fileName = String.format("slice_%d", sliceIndex);
             RecordFileManager.getInstance(this).prepareRecordFile(fileName);
-        }
 
+            myTimer.startTimer();
+        }
+    }
+
+    /**
+     * 计算分数
+     */
+    public void caculateScore() {
+        // 遍历音高数据数组
+        int targetIndex = 0;
+        for (int i = 0; i < pitchDatas.size(); i++) {
+            PitchData data = pitchDatas.get(i);
+            MusicXMLNoteParser.Note targetNote = notesArray.get(targetIndex);
+            if (!targetNote.rest && data.time >= targetNote.startTime && data.time <= targetNote.startTime + targetNote.durationTime) {
+                if (data.note == targetNote.midiNote) {
+                    Log.i("caculateScore", "right");
+                    Toast.makeText(this, "对了", Toast.LENGTH_LONG).show();
+                } else {
+                    if (data.note < targetNote.midiNote) {
+                        Toast.makeText(this, "低了" + (targetNote.midiNote - data.note) + "个半音", Toast.LENGTH_LONG).show();
+                    } else if (data.note > targetNote.midiNote) {
+                        Toast.makeText(this, "高了了" + (data.note - targetNote.midiNote) + "个半音", Toast.LENGTH_LONG).show();
+                    }
+                }
+            } else {
+
+            }
+        }
     }
 }

@@ -27,7 +27,7 @@ public class RecordFileManager {
 
     private MediaPlayer mediaPlayer = null;
 
-    private int sampleRateInHz = 44100;
+    private int sampleRateInHz = AudioProcess.SAMPLE_RATE;
 
     private FileOutputStream recordFileOutputStream = null;
 
@@ -84,9 +84,11 @@ public class RecordFileManager {
             file = new File(this.recordFileName + ".raw");
         }
 
+        isRecording = true;
+
         try {
             recordFileOutputStream = new FileOutputStream(file);// 建立一个可存取字节的文件
-            isRecording = true;
+
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
@@ -110,6 +112,8 @@ public class RecordFileManager {
      * 停止向录音文件中写入数据
      */
     public void finishWriteRecordFileData() {
+        isRecording = false;
+
         if (recordFileOutputStream != null) {
             try {
                 recordFileOutputStream.close();
@@ -120,7 +124,7 @@ public class RecordFileManager {
             }
         }
 
-        isRecording = false;
+
     }
 
     /**

@@ -20,8 +20,8 @@ import be.tarsos.dsp.pitch.PitchProcessor;
  */
 public class AudioProcess {
 
-    private static final int SAMPLE_RATE = 44100;
-    public static final int BUFFER_SIZE = 2048; //AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+    public static final int SAMPLE_RATE = 22050;
+    public static final int BUFFER_SIZE = 512; //AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
     public static int bufferSize;
     private AudioRecord mAudioRecord;
 
@@ -72,8 +72,8 @@ public class AudioProcess {
                 }));
 
         dispatcher.addAudioProcessor(new BandPass(830, 770, SAMPLE_RATE));
-        silenceDetector = new SilenceDetector();
-        dispatcher.addAudioProcessor(silenceDetector);
+//        silenceDetector = new SilenceDetector();
+//        dispatcher.addAudioProcessor(silenceDetector);
     }
 
     public void start() {
