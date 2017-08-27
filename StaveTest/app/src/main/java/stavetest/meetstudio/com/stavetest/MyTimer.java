@@ -90,7 +90,7 @@ public class MyTimer {
             m_listener.onTimerUpdated(tickTime, TIMER_PERIOD);
         }
 
-        Log.i("tick", "tickTime = " + tickTime);
+        // Log.i("tick", "tickTime = " + tickTime);
 
         if (maxTime > 0) {
             if (tickTime >= maxTime) {

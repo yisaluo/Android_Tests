@@ -2,6 +2,7 @@ package stavetest.meetstudio.com.stavetest;
 
 import android.content.Context;
 import android.os.Build;
+import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.View;
 import android.webkit.WebView;
@@ -18,7 +19,7 @@ public class TrainingView extends RelativeLayout {
     Button instrumentButton;
     Button voiceButton;
     Button recordButton;
-    Button stopAndScoreButton;
+    public Button stopAndScoreButton;
     RelativeLayout staveLayout;
     RelativeLayout controlLayout;
     View cover;
@@ -43,8 +44,8 @@ public class TrainingView extends RelativeLayout {
         webView = (WebView) this.findViewById(R.id.webview);
         instrumentButton = (Button) this.findViewById(R.id.standard_instrument);
         voiceButton = (Button) this.findViewById(R.id.standard_voice);
-        recordButton = (Button) this.findViewById(R.id.standard_stop_and_score);
-        stopAndScoreButton = (Button) this.findViewById(R.id.record);
+        recordButton = (Button) this.findViewById(R.id.record);
+        stopAndScoreButton = (Button) this.findViewById(R.id.standard_stop_and_score);
         staveLayout = (RelativeLayout) this.findViewById(R.id.layout_stave);
         controlLayout = (RelativeLayout) this.findViewById(R.id.control_buttons);
         cover = this.findViewById(R.id.cover);

@@ -49,6 +49,8 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
 
     private ArrayList<MusicXMLNoteParser.Note> notesArray = new ArrayList();
 
+    private ArrayList<PitchData> pitchDatas = new ArrayList<>();
+
     private MyTimer myTimer;
 
     @Override
@@ -67,7 +69,7 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
         public int note;
     }
 
-    private ArrayList<PitchData> pitchDatas = new ArrayList<>();
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -139,9 +141,7 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
         }
 
 
-        NoteLoader noteLoader = new NoteLoader(this);
-        noteLoader.listener = this;
-        noteLoader.loadStave("training_7.xml");
+       openSlice(0);
 
         // 检查权限
         if (ContextCompat.checkSelfPermission(this,
@@ -153,6 +153,12 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
         }
 
         myTimer = new MyTimer(this, this);
+    }
+
+    private void openSlice(int index) {
+        NoteLoader noteLoader = new NoteLoader(this);
+        noteLoader.listener = this;
+        noteLoader.loadStave(String.format("training_%d.xml", index));
     }
 
     @Override
@@ -252,6 +258,8 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
         trainingViewHashMap.get(sliceIndex).deactive();
         sliceIndex = index;
         trainingViewHashMap.get(sliceIndex).active();
+
+        openSlice(sliceIndex);
     }
 
     @Override
@@ -366,7 +374,7 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
      * @param view
      */
     public void onInstrumentButton(View view) {
-
+        Toast.makeText(this, "乐器音示范", Toast.LENGTH_LONG).show();
     }
 
     /**
@@ -374,7 +382,7 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
      * @param view
      */
     public void onVoiceButton(View view) {
-
+        Toast.makeText(this, "人声示范", Toast.LENGTH_LONG).show();
     }
 
     /**
@@ -416,23 +424,37 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
     public void caculateScore() {
         // 遍历音高数据数组
         int targetIndex = 0;
+        int counts = 0;
+        int rights = 0;
         for (int i = 0; i < pitchDatas.size(); i++) {
             PitchData data = pitchDatas.get(i);
             MusicXMLNoteParser.Note targetNote = notesArray.get(targetIndex);
             if (!targetNote.rest && data.time >= targetNote.startTime && data.time <= targetNote.startTime + targetNote.durationTime) {
+                counts++;
                 if (data.note == targetNote.midiNote) {
                     Log.i("caculateScore", "right");
-                    Toast.makeText(this, "对了", Toast.LENGTH_LONG).show();
+                    // Toast.makeText(this, "对了", Toast.LENGTH_LONG).show();
+                    rights++;
                 } else {
                     if (data.note < targetNote.midiNote) {
-                        Toast.makeText(this, "低了" + (targetNote.midiNote - data.note) + "个半音", Toast.LENGTH_LONG).show();
+                        // Toast.makeText(this, "低了" + (targetNote.midiNote - data.note) + "个半音", Toast.LENGTH_LONG).show();
                     } else if (data.note > targetNote.midiNote) {
-                        Toast.makeText(this, "高了了" + (data.note - targetNote.midiNote) + "个半音", Toast.LENGTH_LONG).show();
+                        // Toast.makeText(this, "高了了" + (data.note - targetNote.midiNote) + "个半音", Toast.LENGTH_LONG).show();
                     }
                 }
             } else {
 
             }
         }
+
+        float score = (float)rights / (float)counts;
+        trainingViewHashMap.get(sliceIndex).stopAndScoreButton.setText(String.format("%.2f", score * 100));trainingViewHashMap.get(sliceIndex).deactive();
+        sliceIndex++;
+        if (sliceIndex >= trainingViewHashMap.size()) {
+            sliceIndex--;
+            return;
+        }
+        trainingViewHashMap.get(sliceIndex).active();
+        openSlice(sliceIndex);
     }
 }

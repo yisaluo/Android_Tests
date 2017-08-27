@@ -7,7 +7,7 @@
  <identification>
   <rights>版权 © </rights>
   <encoding>
-   <encoding-date>2017-08-23</encoding-date>
+   <encoding-date>2017-08-27</encoding-date>
    <encoder>ChrisDu</encoder>
    <software>Sibelius 8.3.0</software>
    <software>Direct export, not from Dolet</software>
@@ -89,7 +89,7 @@
  </part-list>
  <part id="P1">
   <!--============== Part: P1, Measure: 1 ==============-->
-  <measure number="1" width="614">
+  <measure number="1" width="507">
    <print new-page="yes">
     <system-layout>
      <system-margins>
@@ -116,37 +116,20 @@
     </clef>
     <staff-details number="1" print-object="yes" />
    </attributes>
-   <note color="#000000" default-x="76" default-y="5">
+   <note color="#000000" default-x="76">
     <pitch>
      <step>G</step>
      <octave>4</octave>
     </pitch>
-    <duration>256</duration>
+    <duration>1024</duration>
     <instrument id="P1-I1" />
     <voice>1</voice>
-    <type>quarter</type>
-    <stem>up</stem>
-    <staff>1</staff>
-   </note>
-   <note default-x="221">
-    <rest />
-    <duration>256</duration>
-    <instrument id="P1-I1" />
-    <voice>1</voice>
-    <type>quarter</type>
-    <staff>1</staff>
-   </note>
-   <note default-x="367">
-    <rest />
-    <duration>512</duration>
-    <instrument id="P1-I1" />
-    <voice>1</voice>
-    <type>half</type>
+    <type>whole</type>
     <staff>1</staff>
    </note>
   </measure>
   <!--============== Part: P1, Measure: 2 ==============-->
-  <measure number="2" width="418">
+  <measure number="2" width="525">
    <note>
     <rest />
     <duration>1024</duration>
