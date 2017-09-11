@@ -53,6 +53,8 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
 
     private MyTimer myTimer;
 
+    public static MainActivity m_instance = null;
+
     @Override
     public void onTimerUpdated(float totalTime, float dt) {
 
@@ -76,9 +78,29 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        m_instance = this;
+
         copyFile("opensheetdisplay.html");
         copyFile("vexflow-min.js");
         copyFile("vexflow_view.js");
+
+        copyFile("training_0.wav");
+        copyFile("training_1.wav");
+        copyFile("training_2.wav");
+        copyFile("training_3.wav");
+        copyFile("training_4.wav");
+        copyFile("training_5.wav");
+        copyFile("training_6.wav");
+        copyFile("training_7.wav");
+
+        copyFile("voice_0.mp3");
+        copyFile("voice_1.wav");
+        copyFile("voice_2.wav");
+        copyFile("voice_3.wav");
+        copyFile("voice_4.wav");
+        copyFile("voice_5.wav");
+        copyFile("voice_6.wav");
+        copyFile("voice_7.wav");
 
         mScrollView = (ScrollView)findViewById(R.id.scrollview);
         mLinearLayout = (LinearLayout)findViewById(R.id.staves_layout);
@@ -375,6 +397,8 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
      */
     public void onInstrumentButton(View view) {
         Toast.makeText(this, "乐器音示范", Toast.LENGTH_LONG).show();
+
+        RecordFileManager.getInstance(this).playLocalFile(String.format("training_%d.wav", sliceIndex));
     }
 
     /**
@@ -383,6 +407,8 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
      */
     public void onVoiceButton(View view) {
         Toast.makeText(this, "人声示范", Toast.LENGTH_LONG).show();
+
+        RecordFileManager.getInstance(this).playLocalFile(String.format("voice_%d.wav", sliceIndex));
     }
 
     /**
@@ -390,6 +416,8 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
      * @param view
      */
     public void onScoreAndReplayButton(View view) {
+        RecordFileManager.getInstance(this).stopPlay();
+
         if (RecordFileManager.getInstance(this).isPlaying) {
             RecordFileManager.getInstance(this).stopPlayRecordFile();
         } else {
@@ -402,6 +430,8 @@ public class MainActivity extends AppCompatActivity implements NoteLoader.NoteLo
      * @param view
      */
     public void onRecordButton(View view) {
+        RecordFileManager.getInstance(this).stopPlay();
+
         Log.i("onRecordButton", "onRecordButton");
         if (RecordFileManager.getInstance(this).isRecording) {
             RecordFileManager.getInstance(this).finishWriteRecordFileData();

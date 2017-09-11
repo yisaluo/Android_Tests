@@ -168,6 +168,7 @@ public class RecordFileManager {
      * 播放录音文件
      */
     public void playRecordFile() {
+        this.stopPlay();
         mPlayer.playLocalFile(this.recordFileName + ".wav");
     }
 
@@ -175,6 +176,21 @@ public class RecordFileManager {
      * 停止播放录音文件
      */
     public void stopPlayRecordFile() {
+        this.stopPlay();
+    }
+
+    /**
+     * 播放本地文件
+     * @param fileName
+     */
+    public void playLocalFile(String fileName) {
+        mPlayer.playAssetsFile(fileName);
+    }
+
+    /**
+     * 停止播放
+     */
+    public void stopPlay() {
         mPlayer.stop();
     }
 

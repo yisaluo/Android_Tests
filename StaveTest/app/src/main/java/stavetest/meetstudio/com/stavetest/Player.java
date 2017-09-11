@@ -1,5 +1,6 @@
 package stavetest.meetstudio.com.stavetest;
 
+import android.content.res.AssetFileDescriptor;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.MediaPlayer.OnBufferingUpdateListener;
@@ -107,6 +108,24 @@ public class Player implements OnBufferingUpdateListener, OnCompletionListener, 
             mediaPlayer.setDataSource(filePath);
             mediaPlayer.prepare();
         } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void playAssetsFile(String fileName) {
+        autoStart = true;
+        AssetFileDescriptor fileDescriptor;
+        try {
+            fileDescriptor = MainActivity.m_instance.getAssets().openFd(fileName);
+
+            initMediaPlayer();
+
+            mediaPlayer.setDataSource(fileDescriptor.getFileDescriptor(),
+                    fileDescriptor.getStartOffset(),
+                    fileDescriptor.getLength());
+
+            mediaPlayer.prepare();
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
